@@ -1,19 +1,26 @@
 # trafgen
 set of bash script to create N pods to generate NxN UDP between pods
 
-First we copy to all target pods
+First, we copy a script that will produce a pod-specific C struct that is later consumed by traffic.
+It is done for all pods that generate traffic.
 
-First we generate templates per each pod.
+First, we generate templates per each pod, that will populate
+src mac / dst mac in header and src IP ( whatever pod has on eth0 )
+
+In phase two, we get all client IPs, i.e, client pod or anything else 
+that can count. 
+
+For now it NxN 
 
 ```bash
 #!/bin/bash
 # Generate udp trafgen config per pod
 # - get own IP req for IP header
-# - resolve default gateway and send two ping so the arp cache populate
+# - resolve default gateway and send two pings so the arp cache populate
 # - parse so we get dst mac
-# - take own src mac and unpack byte populate in template
+# - take your own src mac and unpack byte populate in a template
 # create C struct
-# generate and show in console so we can verify
+# generate and show in the console so we can verify
 # Mus mbayramov@vmware.com
 
 # Extract each byte from mac addr and return as comma separate str
@@ -28,7 +35,7 @@ get_mac_eth0() {
     awk -F ':' '{printf("0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s", $1, $2, $3, $4, $5, $6)}'
 }
 
-# ping gw , do arping , get gateway mac addr
+# ping gw, do arping , get gateway mac addr
 # create string i.e byte command seperated
 get_gateway_mac() {
     local gateway_ip=$(ip route | grep default | awk '{print $3}')
@@ -70,7 +77,9 @@ generate_config() {
 generate_config
 ```
 
-We run this script and it generate_per_pod.sh on each pod.
+We run this script, and it runs generates_per_pod.sh on each pod.
+That results in /tmp/udp.trafgen  file that we can use on each pod to 
+generate.
 
 ```bash
 #!/bin/bash
@@ -102,9 +111,9 @@ do
 done
 ```
 
-Now we can start ( this still needs to be done). Right now, only increase pps of no drop on geneve
-(TODO check RX drop from nic from container i.e., container-xxx if no drop nether from container nor 
-geneve nor eth0 increase pps)
+Now we can start ( this still needs to be done ). 
+Right now, only increase pps of no drop on geneve (TODO check RX drop from nic from container, 
+i.e., container-xxx if no drop nether from container nor geneve nor eth0 increase pps)
 
 Do with N pods
 So we can binary search. 
