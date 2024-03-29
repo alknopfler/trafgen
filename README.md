@@ -49,20 +49,19 @@ This will create 8 files in metric folder.
 Example
 
 ```bash
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:26:21 2024    rx_1000000pps_120_core_0_size_64_20240328122409.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:08:47 2024    rx_100000pps_120_core_0_size_64_20240328120635.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:03:30 2024    rx_10000pps_120_core_0_size_64_20240328120118.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 11:24:01 2024    rx_1000pps_120_core_0-1_size_64_20240328112149.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 11:58:29 2024    rx_1000pps_120_core_0_size_64_20240328115617.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:31:17 2024    rx_1200000pps_120_core_0_size_64_20240328122905.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 13:48:04 2024    rx_200000pps_120_core_0_size_64_20240328134551.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:26:21 2024    tx_1000000pps_120_core_0_size_64_20240328122409.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:08:47 2024    tx_100000pps_120_core_0_size_64_20240328120635.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:03:30 2024    tx_10000pps_120_core_0_size_64_20240328120118.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 11:24:01 2024    tx_1000pps_120_core_0-1_size_64_20240328112149.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 11:58:29 2024    tx_1000pps_120_core_0_size_64_20240328115617.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 12:31:17 2024    tx_1200000pps_120_core_0_size_64_20240328122905.txt
-   rw-r--r--    1   spyroot   staff      5 KiB   Thu Mar 28 13:48:04 2024    tx_200000pps_120_core_0_size_64_20240328134551.txt
+    rx_1000000pps_120_core_0_size_64_20240328122409.txt
+    rx_100000pps_120_core_0_size_64_20240328120635.txt
+    rx_10000pps_120_core_0_size_64_20240328120118.txt
+    rx_1000pps_120_core_0-1_size_64_20240328112149.txt
+    rx_1000pps_120_core_0_size_64_20240328115617.txt
+    rx_1200000pps_120_core_0_size_64_20240328122905.txt
+    rx_200000pps_120_core_0_size_64_20240328134551.txt
+    tx_1000000pps_120_core_0_size_64_20240328122409.txt
+    tx_100000pps_120_core_0_size_64_20240328120635.txt
+    tx_10000pps_120_core_0_size_64_20240328120118.txt
+    tx_1000pps_120_core_0-1_size_64_20240328112149.txt
+    tx_1200000pps_120_core_0_size_64_20240328122905.txt
+    tx_200000pps_120_core_0_size_64_20240328134551.txt
 ```
 
 Later we can run inference.py to read all this file and 
