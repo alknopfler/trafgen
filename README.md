@@ -135,9 +135,9 @@ Example
 ```
 
 ![TX Bounded](tx_bounded_64_cores_4.png)
-![RX Bounded](https://github.com/spyroot/trafgen/rx_bounded_64_cores_4.png)
-![Drop Bounded](https://github.com/spyroot/trafgen/drop_bounded_64_cores_4.png)
-![SW IRQ Bounded](https://github.com/spyroot/trafgen/sw_irq_bounded_64_cores_4.png)
+![RX Bounded](rx_bounded_64_cores_4.png)
+![Drop Bounded](drop_bounded_64_cores_4.png)
+![SW IRQ Bounded](sw_irq_bounded_64_cores_4.png)
 
 Later we can run inference.py to read all this file and 
 run cross correlation and visualization.
