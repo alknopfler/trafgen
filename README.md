@@ -1,27 +1,43 @@
 # trafgen
 
 ## Instruction
-Set of bash script and inference scripts that I use to benchmark Linux IP stack.
-This script create N profile on each POD and run trafgen for each profile.  It collect data
-on sender and receiver pod.  
 
-All data collected to separate file and later passed to inference offline mode to perform
-set of correlation and visualization.
+This repo hosts a set of bash scripts and inference scripts that I use to benchmark the Linux IP stack. 
+This script requires access to kubeconfig, so make sure you update the KUBECONFIG env variable.
 
+Our goal is to validate performance at different packet sizes/packet rates; hence, the set script 
+creates N traffic profiles for each POD during the initial phase. Later, each run consumes the same 
+profile and pass to trafgen; each run can change core affinity, packet size, packet rate.
+
+All data is collected into separate files and later passed to inference offline mode to 
+perform a set of correlations and visualization.
 
 ## Usage
 
-First create pods by running create_pods.sh script.  This script will create N server and N client pods.
-Then run generate_config.sh script to generate config for each pod.  This script will copy to each pod
+First, create pods by running create_pods.sh script. This script will create N server and N client pods. 
+Then run the generate_per_pod.sh script to generate the config for each pod. This script will be 
+copied to each pod
 pkt_generate_template.sh
 
-pkt_generate_template later executed.  What this script does it first resolve default gateway IP address.
-It will perform single icmp packet to resolve ARP cache an arping.  It will use default gateway mac address
-as dst mac address on generated frame.
+pkt_generate_template later executed. What this script does is first resolve the default gateway IP address.
+It will perform a single ICMP packet to resolve ARP cache and arping. It will use the default gateway mac address
+as the dst mac address on the generated frame.
 
-The destination IP address passed to each pod so we have 1:1 mapping between server and clinet. 
-I.e we have pair of N server-client where each server will send traffic to it corresponding client.
+The destination IP address is passed to each pod, so we have a 1:1 mapping between the server and the client. 
+e.e. we have pair of N server-client where each server will send traffic to it corresponding client.
 
+Initial setup
+
+```bash
+ pip install numpy
+ pip install matplotlib
+
+create_pods.sh
+generate_per_pod.sh
+
+```
+
+Generate per pod will output C struct, so you can check that dst mac IP set per pod.
 
 This phase need to be done only once during pod creation.
 
