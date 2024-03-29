@@ -134,10 +134,10 @@ Example
     tx_200000pps_120_core_0_size_64_20240328134551.txt
 ```
 
-![TX Bounded](tx_bounded_64_cores_4.png)
-![RX Bounded](rx_bounded_64_cores_4.png)
-![Drop Bounded](drop_bounded_64_cores_4.png)
-![SW IRQ Bounded](sw_irq_bounded_64_cores_4.png)
+![TX Bounded](plots/tx_bounded_64_cores_4.png)
+![RX Bounded](plots/rx_bounded_64_cores_4.png)
+![Drop Bounded](plots/drop_bounded_64_cores_4.png)
+![SW IRQ Bounded](plots/sw_irq_bounded_64_cores_4.png)
 
 Later we can run inference.py to read all this file and 
 run cross correlation and visualization.
