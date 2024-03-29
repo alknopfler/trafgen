@@ -12,6 +12,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
+import subprocess
 
 
 def dataset_files(directory):
@@ -84,16 +85,54 @@ def dataset_files(directory):
     return file_details
 
 
+def print_metric(dataset):
+    """
+    Process the files and calculate metrics and output meat value if we need
+    N sample we can check std for same core / pkt size.
+    :param dataset:
+    :return:
+    """
+    for key, details in dataset.items():
+        tx_data = details['tx_data']
+        rx_data = details['rx_data']
+
+        mean_tx_pps = np.mean(tx_data[:, 1])
+        mean_rx_pps = np.mean(rx_data[:, 0])
+
+        tx_drop = tx_data[:, 2]
+        rx_drop = rx_data[:, 2]
+        tx_err = tx_data[:, 4]
+        rx_err = rx_data[:, 4]
+
+        mean_tx_drop = np.mean(tx_drop)
+        mean_rx_drop = np.mean(rx_drop)
+        mean_tx_err = np.mean(tx_err)
+        mean_rx_err = np.mean(rx_err)
+
+        print(f"""
+        Packet Size: {details['size']}
+        Cores: {details['cores']}
+        Target PPS: {details['pps']}
+        Mean TX PPS: {mean_tx_pps}
+        Mean RX PPS: {mean_rx_pps}
+        Mean TX Drop: {mean_tx_drop}
+        Mean RX Drop: {mean_rx_drop}
+        Mean TX Error: {mean_tx_err}
+        Mean RX Error: {mean_rx_err}
+        """)
+
+
 def plot_drop_rate(
-        dataset,
-        size,
-        cores
+        dataset: dict,
+        size: int,
+        cores: list[int],
+        output=None
 ):
     """Plot PPS against drop rate for different target PPS values and cores.
-
     :param dataset: Dictionary containing file details.
     :param size: Packet size for which experiments are conducted.
     :param cores: List of cores for which experiments are conducted.
+    :param output:
     :return:
     """
 
@@ -122,16 +161,22 @@ def plot_drop_rate(
     plt.title(f'Drop Rate vs PPS for Packet Size {size} and Cores {cores}')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    if output:
+        plt.savefig(output)
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
 
 
 def plot_tx_bound(
-        dataset,
-        size,
-        cores,
-        tolerance=0.02
+        dataset: dict,
+        size: int,
+        cores: list[int],
+        tolerance=0.02,
+        output=None
 ):
     """Plot PPS against observed TX vs target PPS.
+    :param output:
     :param dataset: Dictionary containing file details.
     :param size: Packet size for which experiments are conducted.
     :param cores: List of cores for which experiments are conducted.
@@ -176,10 +221,20 @@ def plot_tx_bound(
     ax.grid(True)
 
     plt.tight_layout()
-    plt.show()
+    if output:
+        plt.savefig(output)
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
 
 
-def plot_rx_bound(dataset, size, cores, tolerance=0.02):
+def plot_rx_bound(
+        dataset: dict,
+        size,
+        cores,
+        tolerance=0.02,
+        output=None
+):
     """ Plot a bar graph showing the target PPS, observed TX PPS, and observed RX PPS.
     Here we cross corelate tx / rx and target.  Assume TX x and RX x while target y.
     i.e.TX bounded by busy wait / CPU etc.
@@ -188,17 +243,10 @@ def plot_rx_bound(dataset, size, cores, tolerance=0.02):
     :param size:
     :param cores:
     :param tolerance:
+    :param output:
     :return:
     """
-    """
-    Plot a bar graph showing the target PPS, observed TX PPS, and observed RX PPS.
 
-    Args:
-    dataset (dict): Dictionary containing file details.
-    size (int): Packet size for which experiments are conducted.
-    cores (list): List of cores for which experiments are conducted.
-    tolerance (float): Acceptable error percentage.
-    """
     target_pps_list = []
     observed_tx_pps_list = []
     observed_rx_pps_list = []
@@ -241,111 +289,19 @@ def plot_rx_bound(dataset, size, cores, tolerance=0.02):
     ax.grid(True)
 
     plt.tight_layout()
-    plt.show()
+
+    if output:
+        plt.savefig(output)
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
 
 
-def print_metric(dataset):
-    """
-    Process the files and calculate metrics and output meat value if we need
-    N sample we can check std for same core / pkt size.
-    :param dataset:
-    :return:
-    """
-    for key, details in dataset.items():
-        tx_data = details['tx_data']
-        rx_data = details['rx_data']
-
-        mean_tx_pps = np.mean(tx_data[:, 1])
-        mean_rx_pps = np.mean(rx_data[:, 0])
-        tx_drop = tx_data[:, 2]
-        rx_drop = rx_data[:, 2]
-        tx_err = tx_data[:, 4]
-        rx_err = rx_data[:, 4]
-
-        mean_tx_drop = np.mean(tx_drop)
-        mean_rx_drop = np.mean(rx_drop)
-        mean_tx_err = np.mean(tx_err)
-        mean_rx_err = np.mean(rx_err)
-
-        print(f"Key: {key}")
-        print(f"Packet Size: {details['size']}")
-        print(f"Cores: {details['cores']}")
-        print(f"Target PPS: {details['pps']}")
-        print(f"Mean TX PPS: {mean_tx_pps}")
-        print(f"Mean RX PPS: {mean_rx_pps}")
-        print(f"Mean TX Drop: {mean_tx_drop}")
-        print(f"Mean RX Drop: {mean_rx_drop}")
-        print(f"Mean TX Error: {mean_tx_err}")
-        print(f"Mean RX Error: {mean_rx_err}")
-        print()
-
-
-def plot_drop_rate_same_core(metric_dataset):
-    """
-    :param metric_dataset:
-    :return:
-    """
-    grouped_experiments = set()
-    for key, details in metric_dataset.items():
-        size = details['size']
-        cores = tuple(details['cores'])
-        grouped_experiments.add((size, cores))
-
-    for experiment in grouped_experiments:
-        plot_drop_rate_same_core(metric_dataset, experiment[0], list(experiment[1]))
-
-
-def plot_tx_bound_same_core(metric_dataset):
-    """
-
-    :param metric_dataset:
-    :return:
-    """
-    grouped_experiments = set()
-    for key, details in metric_dataset.items():
-        size = details['size']
-        cores = tuple(details['cores'])
-        grouped_experiments.add((size, cores))
-
-    for experiment in grouped_experiments:
-        plot_tx_bound(metric_dataset, experiment[0], list(experiment[1]))
-
-
-def plot_rx_bound_same_core(metric_dataset):
-    """
-
-    :param metric_dataset:
-    :return:
-    """
-    grouped_experiments = set()
-    for key, details in metric_dataset.items():
-        size = details['size']
-        cores = tuple(details['cores'])
-        grouped_experiments.add((size, cores))
-
-    for experiment in grouped_experiments:
-        plot_rx_bound(metric_dataset, experiment[0], list(experiment[1]))
-
-
-def plot_drop_bound_same_core(metric_dataset):
-    """
-    :param metric_dataset:
-    :return:
-    """
-    grouped_experiments = set()
-    for key, details in metric_dataset.items():
-        size = details['size']
-        cores = tuple(details['cores'])
-        grouped_experiments.add((size, cores))
-
-    for experiment in grouped_experiments:
-        plot_drop_rate(metric_dataset, experiment[0], list(experiment[1]))
-
-
-def _plot_irq_sirq_rates(
+def plot_irq_sw_irq_rate(
         dataset: dict,
         size: int,
-        cores: list[int]
+        cores: list[int],
+        output=None,
 ):
     """
     :param dataset:  a dataset
@@ -393,15 +349,23 @@ def _plot_irq_sirq_rates(
     ax.legend()
     ax.grid(True, which="both", ls="-")
 
-    plt.tight_layout()
-    plt.show()
+    if output:
+        plt.savefig(output)
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
 
 
-def plot_irq_sirq_rates(metric_dataset):
-    """Plot for each packet size / core rate of irq vs target pps vs tx and rx pps.
-    i.e. we want to see at target pps ( assume observed pps) < target pps we want to see
-    how many irq generated in system. (i.e. potentially headline of blocking)
+def plot_stats(
+        metric_dataset: dict,
+        plotter: callable,
+        output_dir=None
+):
+    """plot stats take metric dataset,
+    callback that will plot and output dir (optional)
 
+    :param plotter:
+    :param output_dir:
     :param metric_dataset:
     :return:
     """
@@ -412,28 +376,60 @@ def plot_irq_sirq_rates(metric_dataset):
         grouped_experiments.add((size, cores))
 
     for experiment in grouped_experiments:
-        _plot_irq_sirq_rates(metric_dataset, experiment[0], list(experiment[1]))
+        core_str = '-'.join(list(experiment[1]))
+        if output_dir:
+            output_file = os.path.join(
+                output_dir,
+                f"irq_sirq_rates_size_{experiment[0]}_cores_{core_str}.png"
+            )
+        else:
+            output_file = None
+
+        plotter(metric_dataset, experiment[0], list(experiment[1]), output=output_file)
+
+
+def run_sampling(pps_values):
+    """Rn sampling script for each target pps.
+    :param pps_values: list of pps value we collect samples for.
+    :return:
+    """
+    for pps in pps_values:
+        print(f"Running sampling for {pps} pps...")
+        subprocess.run(['./run_monitor_pps.sh', '-p', str(pps)])
+    print("Sampling completed.")
 
 
 def main(cmd):
-    """
+    """Run main , note sampling is optional arg, by default,
+    we read metric dir and plot all samples collected.
     :return:
     """
+    if cmd.sample:
+        run_sampling(cmd.pps_values)
+
+    if cmd.output_dir:
+        os.makedirs(cmd.output_dir, exist_ok=True)
+
     directory = os.path.join(os.getcwd(), cmd.metric_dir)
     metric_dataset = dataset_files(directory)
 
     if cmd.print_metric:
         print_metric(metric_dataset)
 
-    plot_tx_bound_same_core(metric_dataset)
-    plot_rx_bound_same_core(metric_dataset)
-    plot_drop_bound_same_core(metric_dataset)
-    plot_irq_sirq_rates(metric_dataset)
+    plot_stats(metric_dataset, plot_tx_bound, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, plot_rx_bound, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, plot_drop_rate, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, plot_irq_sw_irq_rate, output_dir=cmd.output_dir)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process metrics directory.')
-    parser.add_argument('metric_dir', type=str, help='Directory path for metrics', default='metrics')
+    parser.add_argument('-m', '--metric_dir', type=str, default='metrics', help='Directory path for metrics')
     parser.add_argument('-p', '--print', dest='print_metric', action='store_true', help='Print metric dataset')
+    parser.add_argument('-s', '--sample', action='store_true', help='Collect samples before processing metrics')
+    parser.add_argument('--pps_values', nargs='*',
+                        type=int, default=[1000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000],
+                        help='List of PPS values for sampling')
+    parser.add_argument('-o', '--output_dir', type=str, help='Output directory for plots')
     args = parser.parse_args()
     main(args)
