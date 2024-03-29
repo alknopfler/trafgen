@@ -1,8 +1,15 @@
 #!/bin/bash
-# Create server and client pods.
-# It uses pod template file to populate name node name etc.
-# note by default it pick up two node one used for server one for client
-# i.e. affinity set in way so server on worker a client on b
+# Create server and client pods by reading two POD template files.
+# it set target image, and other parameters.
+#
+# Note it doesn't read default KUBECONFIG to avoid dodgy case
+# hence put kubeconfig in same spot where is script.
+#
+# Note It uses pod template file to populate name node name etc.
+# note by default it pick up two node one used for server
+# one for client i.e. affinity set in way so server on worker a client on b
+# if pass arg it will deploy all pod on same node. Note by default it doesn't use control
+# you can remove that check if needed.
 
 # This one for OCP same node
 # Mus
