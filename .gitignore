@@ -2,3 +2,5 @@
 /id_rsa.pub
 /src/kubeconfig
 .DS_Store
+/src/pods/*
+/src/metrics/*
