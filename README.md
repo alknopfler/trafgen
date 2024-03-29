@@ -26,7 +26,7 @@ as the dst mac address on the generated frame.
 The destination IP address is passed to each pod, so we have a 1:1 mapping between the server and the client. 
 e.e. we have pair of N server-client where each server will send traffic to it corresponding client.
 
-Initial setup
+### Initial setup
 
 ```bash
  pip install numpy
@@ -43,22 +43,34 @@ This phase need to be done only once during pod creation.
 
 ### Data collection.
 
-in case we want monitor or collect run ./run_monitor_ssh script.  This script will run trafgen between two POD
-i.e we want to validate POD to POD communication on same worker node.
+in case we want monitor or collect run ./run_monitor_ssh script. 
 
-script take -p as mandatory arg it pps rate in second -p 1000 1000 pps per sec.
-same script launch trafgen and and collect data on sender and receiver pod.
+This script will run trafgen between two target POD. ( by default it use server0 and serve1)
+(we want to validate POD to POD communication on same worker node.)
 
-All data read from sysfs and collected to separate file.  
+This script takes -p as mandatory argument, it is pps rate in second 
+-p 1000 1000 pps per sec. 
+
+same script launch trafgen and collect data on sender and receiver pod.
+
+During data generation if we run in monitor mode it will only show data collected
+on receiver.
+
+It does so by executing monitor_pps.sh on receiver pod.
+
+- In collection mode it will run same monitor_pps.sh on sender and receiver pod
+and serialize metric as cvs value per sample time.
+
+- All data read from sysfs and collected to separate file.  
 
 Assume we want use default core ( single core per trafgen)
+
 ```bash
 ./run_monitor_ssh.sh -p 1000
 ./run_monitor_ssh.sh -p 10000
 ./run_monitor_ssh.sh -p 100000
 ./run_monitor_ssh.sh -p 1000000
 ```
-
 
 This will create 8 files in metric folder.
 
