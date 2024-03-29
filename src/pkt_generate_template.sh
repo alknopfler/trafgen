@@ -10,6 +10,8 @@
 
 DEFAULT_SRC_PORT="9"
 DEFAULT_DST_PORT="6666"
+DEFAULT_PD_SIZE="18"
+PD_SIZE="$DEFAULT_PD_SIZE"
 
 if [ -n "$1" ]; then
     SRC_PORT="$1"
@@ -17,11 +19,43 @@ else
     SRC_PORT="$DEFAULT_SRC_PORT"
 fi
 
-if [ -n "$2" ]; then
-    DST_PORT="$2"
-else
-    DST_PORT="$DEFAULT_DST_PORT"
-fi
+SRC_PORT="$DEFAULT_SRC_PORT"
+DST_PORT="$DEFAULT_DST_PORT"
+PD_SIZE="$DEFAULT_PD_SIZE"
+
+display_help() {
+    echo "Usage: $0 [-s <source port>] [-d <destination port>] [-p <payload size>]"
+    echo "-s: Source port for UDP traffic"
+    echo "-d: Destination port for UDP traffic"
+    echo "-p: Payload size for UDP packets"
+}
+
+while getopts ":s:d:p:i:" opt; do
+    case ${opt} in
+        s)
+            SRC_PORT=$OPTARG
+            ;;
+        d)
+            DST_PORT=$OPTARG
+            ;;
+        p)
+            PD_SIZE=$OPTARG
+            ;;
+        i)
+            DEST_IP=$OPTARG
+            ;;
+        \?)
+            display_help
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument."
+            display_help
+            exit 1
+            ;;
+    esac
+done
+shift $((OPTIND -1))
 
 # Extract each byte from mac addr and return as comma separate str
 get_src_ip_components() {
@@ -48,8 +82,14 @@ get_gateway_mac() {
 
 # generate config
 generate_config() {
-    local dst_ip="$DEST_IP"
-    local dst_ip_arr=($(echo "$dst_ip" | tr '.' ' '))
+    local dst_ip
+    local dst_ip_arr
+    local total_length
+
+    dst_ip="$DEST_IP"
+    dst_ip_arr=($(echo "$dst_ip" | tr '.' ' '))
+    total_length=$((20 + 8 + PD_SIZE))
+
     echo "#define ETH_P_IP 0x0800"
     echo "{"
     get_gateway_mac
@@ -58,7 +98,7 @@ generate_config() {
     echo ","
     echo "const16(ETH_P_IP),"
     echo "0b01000101, 0,  /* IPv4 Version, IHL, TOS */"
-    echo "const16(46),    /* IPv4 Total Len (UDP len + IP hdr 20 bytes)*/"
+    echo "const16($total_length),    /* IPv4 Total Len (UDP len + IP hdr 20 bytes)*/"
     echo "const16(2),     /* IPv4 Ident */"
     echo "0b01000000, 0,  /* IPv4 Flags, Frag Off */"
     echo "64,             /* IPv4 TTL */"
@@ -71,7 +111,7 @@ generate_config() {
     echo "const16($DST_PORT), /* UDP Dest Port */"
     echo "const16(26),   /* UDP length (UDP hdr 8 bytes + payload size */"
     echo "const16(0),"
-    echo "fill('B', 18),"
+    echo "fill('B', $PD_SIZE),"
     echo "}"
 }
 
