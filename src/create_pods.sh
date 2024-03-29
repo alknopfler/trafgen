@@ -5,7 +5,9 @@
 # i.e. affinity set in way so server on worker a client on b
 # Mus
 
-export KUBECONFIG=/Users/spyroot/voda_cluster/ocp/kubeconfig
+# by default expect same dir
+
+export KUBECONFIG="kubeconfig"
 mkdir -p pods
 
 cpu_limit="4"

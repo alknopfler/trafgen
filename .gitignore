@@ -1,0 +1,4 @@
+/id_rsa.private
+/id_rsa.pub
+/kubeconfig
+.DS_Store
