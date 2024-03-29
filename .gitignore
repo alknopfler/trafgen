@@ -1,4 +1,4 @@
 /id_rsa.private
 /id_rsa.pub
-/kubeconfig
+/src/kubeconfig
 .DS_Store
