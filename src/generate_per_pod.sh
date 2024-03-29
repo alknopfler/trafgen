@@ -8,7 +8,7 @@ DEFAULT_SRC_PORT="9"
 DEFAULT_DST_PORT="6666"
 
 # default pd size on the wire, add all header on top
-DEFAULT_PD_SIZE="18"
+DEFAULT_PD_SIZE="22"
 SRC_PORT="$DEFAULT_SRC_PORT"
 DST_PORT="$DEFAULT_DST_PORT"
 PD_SIZE="$DEFAULT_PD_SIZE"
@@ -75,7 +75,7 @@ do
     kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
     kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
 
-    echo "Executing udp template generator on $pod with pod DEST_IP=$dest_ip payload size ${PD_SIZE}"
+    echo "Executing udp template generator on $pod with pod DEST_IP=$dest_ip payload size ${PD_SIZE} bytes."
     kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp_$PD_SIZE.trafgen"
     echo "Contents of /tmp/udp.trafgen on $pod:"
     kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
@@ -84,7 +84,7 @@ do
     # use the second server pod as destination. ( this executed only once )
     if [ "$i" -eq 0 ]; then
         dest_ip_loopback="${SERVER_IPS[1]}"
-        echo "Executing loopback profile on $pod with pod DEST_IP=$dest_ip_loopback payload size ${PD_SIZE}"
+        echo "Executing loopback profile on $pod with pod DEST_IP=$dest_ip_loopback payload size ${PD_SIZE} bytes."
         kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp.loopback_$PD_SIZE.trafgen"
         echo "Contents of /tmp/udp.loopback_$PD_SIZE.trafgen on $pod:"
         kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen

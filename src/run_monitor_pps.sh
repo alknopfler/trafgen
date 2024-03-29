@@ -19,7 +19,7 @@ NUM_CORES="1"
 PACKET_SIZE="64"
 output_dir="metrics"
 
-DEFAULT_PD_SIZE="18"
+DEFAULT_PD_SIZE="22"
 PD_SIZE="$DEFAULT_PD_SIZE"
 
 function display_help() {
@@ -140,8 +140,7 @@ function run_trafgen() {
 }
 
 function run_monitor() {
-    local pps=$1
-    echo "Starting monitor pod $tx_pod_name core $default_core with $pps pps"
+    echo "Starting monitor pod $tx_pod_name core $default_core"
     kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh eth0
 }
 
@@ -215,7 +214,7 @@ run_trafgen "$current_pps"
 
 #
 if [ "$OPT_MONITOR" = "true" ]; then
-  run_monitor "$OPT_SEC"
+  run_monitor
 else
   collect_pps_rate "$current_pps"
 fi

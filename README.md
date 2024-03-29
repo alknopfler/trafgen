@@ -51,6 +51,38 @@ During initial pod creation create pod read pod spec from template and replace
 value that need to be replaced per pod.  Hence, So if you need adjust anything 
 adjust template first.
 
+
+### Monitor mode.
+
+Default mode example for 1000 pps/sec. -m enable monitor mode.  By default run will 
+use single core.  i.e we select from numa topology let say we have 4 core 0, 1, 2, 3 script will pick 2.
+It will never use 0, 1 in case we have something heavy running on the pod.  
+
+Note this is relevant in case we don't have static pining in kubelet.
+(i.e if you do static pining 0,1 will not allocate anyway)
+
+
+```bash
+run_monitor_pps.sh -p 1000 -m
+Starting traffic generator with 1000 pps for 120 seconds on cores 4
+Starting on pod server0-ve-56377f29-e603-11ee-a122-179ee4765847 core 4 with 1000 pps for 120 sec
+Starting monitor pod server0-ve-56377f29-e603-11ee-a122-179ee4765847 core 4 with 120 sec.
+TX eth0: 7 pkts/s RX eth0: 2000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 1590, SIRQ Rate: 1912 NET_TX_RATE: 0, NET_RX_RATE: 1008 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 2764, SIRQ Rate: 1711 NET_TX_RATE: 0, NET_RX_RATE: 1032 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 1823, SIRQ Rate: 1449 NET_TX_RATE: 0, NET_RX_RATE: 1002 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 3723, SIRQ Rate: 1803 NET_TX_RATE: 0, NET_RX_RATE: 1017 AVG_SIZE: 88
+TX eth0: 3 pkts/s RX eth0: 1002 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 2882, SIRQ Rate: 1545 NET_TX_RATE: 1, NET_RX_RATE: 775 AVG_SIZE: 57
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 1694, SIRQ Rate: 1213 NET_TX_RATE: 0, NET_RX_RATE: 738 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 1369, SIRQ Rate: 1094 NET_TX_RATE: 0, NET_RX_RATE: 741 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 1548, SIRQ Rate: 1133 NET_TX_RATE: 0, NET_RX_RATE: 740 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 3191, SIRQ Rate: 1500 NET_TX_RATE: 0, NET_RX_RATE: 741 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 1482, SIRQ Rate: 1461 NET_TX_RATE: 1, NET_RX_RATE: 1045 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 1425, SIRQ Rate: 1103 NET_TX_RATE: 0, NET_RX_RATE: 742 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 2121, SIRQ Rate: 1200 NET_TX_RATE: 0, NET_RX_RATE: 744 AVG_SIZE: 88
+TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ Rate: 3422, SIRQ Rate: 1812 NET_TX_RATE: 0, NET_RX_RATE: 1011 AVG_SIZE: 88
+```
+
+
 ### Data collection.
 
 in case we want monitor or collect run ./run_monitor_ssh script. 
