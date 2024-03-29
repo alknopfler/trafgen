@@ -24,9 +24,14 @@ It will perform a single ICMP packet to resolve ARP cache and arping. It will us
 as the dst mac address on the generated frame.
 
 The destination IP address is passed to each pod, so we have a 1:1 mapping between the server and the client. 
-e.e. we have pair of N server-client where each server will send traffic to it corresponding client.
+e.e. we have a pair of N server-client where each server will send traffic to it corresponding client.
 
 ### Initial setup
+
+src/pod-client-template.yaml - template for client pods
+src/pod-server-template.yaml - template for server pods
+src/pod-client-template-same_node.yaml - template for same worker node 
+(Later one in case of bare metal OCP like on single node)
 
 ```bash
  pip install numpy

@@ -11,7 +11,7 @@ metadata:
   namespace: default
 spec:
   containers:
-  - image: voereir/touchstone-server-ubuntu:v3.11.1
+  - image: {{image}}
     imagePullPolicy: IfNotPresent
     name: container-{{server-name}}-ve-56377f29-e603-11ee-a122-179ee4765847
     resources:
