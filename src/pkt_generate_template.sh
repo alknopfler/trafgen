@@ -73,11 +73,23 @@ get_mac_eth0() {
 # create string i.e. byte command seperated
 get_gateway_mac() {
     local gateway_ip
+    local gateway_mac
+
     gateway_ip=$(ip route | grep default | awk '{print $3}')
-    ping -c 2 "$gateway_ip" > /dev/null
-    arping -c 1 -I eth0 "$gateway_ip" > /dev/null
-    arp -n | awk -v gw="$gateway_ip" '$1 == gw {print $3}' | \
-    head -n 1 | awk -F ':' '{printf("0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s", $1, $2, $3, $4, $5, $6)}'
+    gateway_mac=$(arp -n | awk -v gw="$gateway_ip" '$1 == gw {print $3}')
+
+    if [ -z "$gateway_mac" ]; then
+      ping -c 2 "$gateway_ip" > /dev/null
+      arping -c 1 -I eth0 "$gateway_ip" > /dev/null
+      gateway_mac=$(arp -n | awk -v gw="$gateway_ip" '$1 == gw {print $3}')
+   fi
+
+    if [ -n "$gateway_mac" ]; then
+        echo "$gateway_mac" | awk -F ':' '{printf("0x%s, 0x%s, 0x%s, 0x%s, 0x%s, 0x%s", $1, $2, $3, $4, $5, $6)}'
+    else
+        echo "Error: MAC address for gateway $gateway_ip not found" >&2
+        return 1
+    fi
 }
 
 # generate config

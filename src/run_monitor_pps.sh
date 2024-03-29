@@ -19,6 +19,9 @@ NUM_CORES="1"
 PACKET_SIZE="64"
 output_dir="metrics"
 
+DEFAULT_PD_SIZE="18"
+PD_SIZE="$DEFAULT_PD_SIZE"
+
 function display_help() {
     echo "Usage: $0 -p <pps> [-s <seconds>] [-m] [-c <num_cores>]"
     echo "Options:"
@@ -29,7 +32,7 @@ function display_help() {
     exit 1
 }
 
-while getopts ":p:s:m:c:" opt; do
+while getopts ":p:s:mc:" opt; do
     case ${opt} in
         p)
             OPT_PPS=$OPTARG
@@ -74,11 +77,8 @@ DEFAULT_MONITOR_TIMEOUT=$((DEFAULT_TIMEOUT + DEFAULT_MONITOR_MARGIN))
 target_pod_name="server0"
 client_pod_name="server1"
 
-initial_pps=10000
-
-duration=60  # Duration in seconds to run each trafgen test
-interval=10  # Interval in seconds to check the TX packet count
-trafgen_udp_file="/tmp/udp.loopback.trafgen"
+DEFAULT_INIT_PPS=10000
+trafgen_udp_file="/tmp/udp.loopback_$PD_SIZE.trafgen"
 
 target_pod_interface="server0"
 uplink_interface="eth0"
@@ -207,10 +207,10 @@ get_and_print_interface_stats() {
 
 echo "Starting traffic generator with $OPT_PPS pps for $DEFAULT_TIMEOUT seconds on cores $default_core"
 
-initial_pps="$OPT_PPS"
+DEFAULT_INIT_PPS="$OPT_PPS"
 kill_all_trafgen
 
-current_pps="$initial_pps"
+current_pps="$DEFAULT_INIT_PPS"
 run_trafgen "$current_pps"
 
 #

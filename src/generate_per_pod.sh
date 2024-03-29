@@ -7,9 +7,8 @@
 DEFAULT_SRC_PORT="9"
 DEFAULT_DST_PORT="6666"
 
-# default frame size on the wire
+# default pd size on the wire, add all header on top
 DEFAULT_PD_SIZE="18"
-
 SRC_PORT="$DEFAULT_SRC_PORT"
 DST_PORT="$DEFAULT_DST_PORT"
 PD_SIZE="$DEFAULT_PD_SIZE"
@@ -69,7 +68,7 @@ do
     pod="${server_pods[$i]}"
     dest_ip="${DEST_IPS[$i]}"
 
-    echo "Copying udp template generator to $pod"
+    echo "Copying udp template generators to a pod $pod"
     kubectl cp pkt_generate_template.sh "$pod":/tmp/pkt_generate_template.sh
     kubectl exec "$pod" -- chmod +x /tmp/pkt_generate_template.sh
 
@@ -77,18 +76,17 @@ do
     kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
 
     echo "Executing udp template generator on $pod with pod DEST_IP=$dest_ip payload size ${PD_SIZE}"
-    kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp.trafgen"
+    kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp_$PD_SIZE.trafgen"
     echo "Contents of /tmp/udp.trafgen on $pod:"
-    kubectl exec "$pod" -- cat /tmp/udp.trafgen
+    kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
 
-    # loopback profile for the first server
-    # pod to use the second server pod as destination
+    # loopback profile for the first server pod to
+    # use the second server pod as destination. ( this executed only once )
     if [ "$i" -eq 0 ]; then
         dest_ip_loopback="${SERVER_IPS[1]}"
         echo "Executing loopback profile on $pod with pod DEST_IP=$dest_ip_loopback payload size ${PD_SIZE}"
-        kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp.loopback.trafgen"
-        echo "Contents of /tmp/udp.loopback.trafgen on $pod:"
-        kubectl exec "$pod" -- cat /tmp/udp.loopback.trafgen
+        kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp.loopback_$PD_SIZE.trafgen"
+        echo "Contents of /tmp/udp.loopback_$PD_SIZE.trafgen on $pod:"
+        kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
     fi
 done
-

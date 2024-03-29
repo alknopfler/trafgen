@@ -67,40 +67,41 @@ while true; do
     NET_TX_RATE=$((NET_TX2 - NET_TX1))
     NET_RX_RATE=$((NET_RX2 - NET_RX1))
 
-    TXPPS=$((T2 - T1))
-    RXPPS=$((R2 - R1))
+    TX_PPS=$((T2 - T1))
+    RX_PPS=$((R2 - R1))
 
-    TXDROP=$((TD2 - TD1))
-    RXDROP=$((RD2 - RD1))
+    TX_DROP=$((TD2 - TD1))
+    RX_DROP=$((RD2 - RD1))
 
-    TXERR=$((TE2 - TE1))
-    RXERR=$((RE2 - RE1))
+    TX_ERR=$((TE2 - TE1))
+    RX_ERR=$((RE2 - RE1))
 
-    TXBYTES=$((TB2 - TB1))
-    RXBYTES=$((RB2 - RB1))
+    TX_BYTES=$((TB2 - TB1))
+    RX_BYTES=$((RB2 - RB1))
 
     IRQ_RATE=$((IRQ2_T2 - IRQ2_T1))
-    SIRQ_RATE=$((SIRQ_T2 - SIRQ_T1))
+    S_IRQ_RATE=$((SIRQ_T2 - SIRQ_T1))
 
-#    if [ "$TXPPS" -gt 0 ]; then
-#        AVG_TX_PACKET_SIZE=$((TXBYTES / TXPPS))
-#    else
-#        AVG_TX_PACKET_SIZE=0
-#    fi
-#
-#    if [ "$RXPPS" -gt 0 ]; then
-#        AVG_RX_PACKET_SIZE=$((RXBYTES / RXPPS))
-#    else
-#        AVG_RX_PACKET_SIZE=0
-#    fi
-    if [ "$DIRECTION" = "tx" ]; then
-        echo "$TXPPS"
-    elif [ "$DIRECTION" = "rx" ]; then
-        echo "$RXPPS"
-    elif [ "$DIRECTION" = "tuple" ]; then
-        echo "$RXPPS, $TXPPS, $RXDROP, $TXDROP, $RXERR, $TXERR, $RXBYTES, $TXBYTES, $IRQ_RATE, $SIRQ_RATE, $NET_TX_RATE, $NET_RX_RATE"
+    if [ "$TX_PPS" -gt 0 ]; then
+        AVG_TX_PACKET_SIZE=$((TX_BYTES / TX_PPS))
     else
-      echo "TX $IF: $TXPPS pkts/s RX $IF: $RXPPS pkts/s TX DROP: $TXDROP pkts/s RX DROP: $RXDROP pkts/s IRQ Rate: $IRQ_RATE, SIRQ Rate: $SIRQ_RATE NET_TX_RATE: $NET_TX_RATE, NET_RX_RATE: $NET_RX_RATE"
+        AVG_TX_PACKET_SIZE=0
+    fi
+
+    if [ "$RX_PPS" -gt 0 ]; then
+        AVG_RX_PACKET_SIZE=$((RX_BYTES / RX_PPS))
+    else
+        AVG_RX_PACKET_SIZE=0
+    fi
+
+    if [ "$DIRECTION" = "tx" ]; then
+        echo "$TX_PPS"
+    elif [ "$DIRECTION" = "rx" ]; then
+        echo "$RX_PPS"
+    elif [ "$DIRECTION" = "tuple" ]; then
+        echo "$RX_PPS, $TX_PPS, $RX_DROP, $TX_DROP, $RX_ERR, $TX_ERR, $RX_BYTES, $TX_BYTES, $IRQ_RATE, $S_IRQ_RATE, $NET_TX_RATE, $NET_RX_RATE"
+    else
+      echo "TX $IF: $TX_PPS pkts/s RX $IF: $RX_PPS pkts/s TX DROP: $TX_DROP pkts/s RX DROP: $RX_DROP pkts/s IRQ Rate: $IRQ_RATE, SIRQ Rate: $S_IRQ_RATE NET_TX_RATE: $NET_TX_RATE, NET_RX_RATE: $NET_RX_RATE AVG_RX_SIZE: $AVG_RX_PACKET_SIZE AVG_TX_SIZE: $AVG_TX_PACKET_SIZE"
     fi
 
 done
