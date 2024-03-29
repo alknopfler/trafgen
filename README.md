@@ -38,8 +38,13 @@ generate_per_pod.sh
 ```
 
 Generate per pod will output C struct, so you can check that dst mac IP set per pod.
-
 This phase need to be done only once during pod creation.
+
+### Details.
+
+During initial pod creation create pod read pod spec from template and replace 
+value that need to be replaced per pod.  Hence, So if you need adjust anything 
+adjust template first.
 
 ### Data collection.
 
