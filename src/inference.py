@@ -358,6 +358,7 @@ def plot_irq_sw_irq_rate(
 
 def plot_stats(
         metric_dataset: dict,
+        plot_type: str,
         plotter: callable,
         output_dir=None
 ):
@@ -376,15 +377,14 @@ def plot_stats(
         grouped_experiments.add((size, cores))
 
     for experiment in grouped_experiments:
-        core_str = '-'.join(list(experiment[1]))
+        core_str = '-'.join(map(str, experiment[1]))
         if output_dir:
             output_file = os.path.join(
                 output_dir,
-                f"irq_sirq_rates_size_{experiment[0]}_cores_{core_str}.png"
+                f"{plot_type}_{experiment[0]}_cores_{core_str}.png"
             )
         else:
             output_file = None
-
         plotter(metric_dataset, experiment[0], list(experiment[1]), output=output_file)
 
 
@@ -416,10 +416,10 @@ def main(cmd):
     if cmd.print_metric:
         print_metric(metric_dataset)
 
-    plot_stats(metric_dataset, plot_tx_bound, output_dir=cmd.output_dir)
-    plot_stats(metric_dataset, plot_rx_bound, output_dir=cmd.output_dir)
-    plot_stats(metric_dataset, plot_drop_rate, output_dir=cmd.output_dir)
-    plot_stats(metric_dataset, plot_irq_sw_irq_rate, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "tx_bounded", plot_tx_bound, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "rx_bounded", plot_rx_bound, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "drop_bounded", plot_drop_rate, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "sw_irq_bounded", plot_irq_sw_irq_rate, output_dir=cmd.output_dir)
 
 
 if __name__ == "__main__":
