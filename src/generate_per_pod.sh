@@ -4,6 +4,13 @@
 # i.e. script inside a POD need to know dst mac / dst ip etc.
 # Mus mbayramov@vmware.com
 
+KUBECONFIG_FILE="kubeconfig"
+if [ ! -f "$KUBECONFIG_FILE" ]; then
+    echo "kubeconfig file not found in the current directory."
+    exit 1
+fi
+export KUBECONFIG="$KUBECONFIG_FILE"
+
 DEST_IPS=($(kubectl get pods -o wide | grep 'client' | awk '{print $6}'))
 SERVER_IPS=($(kubectl get pods -o wide | grep 'server' | awk '{print $6}'))
 server_pods=($(kubectl get pods | grep 'server' | awk '{print $1}'))

@@ -46,7 +46,7 @@ spec:
       readOnly: true
   dnsPolicy: ClusterFirst
   enableServiceLinks: true
-  nodeName: 
+  nodeName: ubuntu-md-0-gv8qv-vffht-4kgdj
   preemptionPolicy: PreemptLowerPriority
   priority: 0
   restartPolicy: Always

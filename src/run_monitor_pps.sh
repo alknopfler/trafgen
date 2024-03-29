@@ -3,6 +3,13 @@
 # and collect data from generator and receiver pod.
 # Mus
 
+KUBECONFIG_FILE="kubeconfig"
+if [ ! -f "$KUBECONFIG_FILE" ]; then
+    echo "kubeconfig file not found in the current directory."
+    exit 1
+fi
+export KUBECONFIG="$KUBECONFIG_FILE"
+
 DEFAULT_TIMEOUT="120"
 DEFAULT_MONITOR_MARGIN="10"
 OPT_PPS=""
@@ -88,15 +95,6 @@ if [ -z "$tx_pod_name" ] || [ -z "$node_name" ] || [ -z "$default_core" ]; then
     echo "Pod, node, or first core not found"
     exit 1
 fi
-
-#echo "Core"
-#echo "$NUM_CORES"
-#
-#echo "DEFAULT_MONITOR_TIMEOUT"
-#echo "$DEFAULT_MONITOR_TIMEOUT"
-#
-#echo "DEFAULT_TIMEOUT"
-#echo "$DEFAULT_TIMEOUT"
 
 if [[ "$NUM_CORES" =~ ^[0-9]+$ ]]; then
     NUM_CORES=$((NUM_CORES))
@@ -215,16 +213,12 @@ kill_all_trafgen
 current_pps="$initial_pps"
 run_trafgen "$current_pps"
 
-run_monitor "$OPT_SEC"
-
-#collect_pps_rate "$current_pps"
-
 #
-#if [ "$OPT_MONITOR" = "true" ]; then
-#    run_monitor "$OPT_SEC"
-#else
-#  collect_pps_rate "$current_pps"
-#fi
+if [ "$OPT_MONITOR" = "true" ]; then
+  run_monitor "$OPT_SEC"
+else
+  collect_pps_rate "$current_pps"
+fi
 
 wait
 ##kill_all_trafgen

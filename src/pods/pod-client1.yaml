@@ -19,7 +19,7 @@ spec:
           - key: name
             operator: In
             values:
-            - server1-ve-xxx
+            - server1-ve-56377f29-e603-11ee-a122-179ee4765847
         topologyKey: kubernetes.io/hostname
   containers:
   - image: voereir/touchstone-server-ubuntu:v3.11.1
@@ -35,17 +35,8 @@ spec:
     securityContext:
       capabilities:
         add:
-          - NET_ADMIN
-          - CAP_SYS_NICE
-          - SYS_NICE
-          - IPC_LOCK
-          - NET_ADMIN
-          - SYS_TIME
-          - CAP_NET_RAW
-          - CAP_BPF
-          - CAP_SYS_ADMIN
-          - SYS_ADMIN
-      privileged: true
+        - NET_ADMIN
+        - IPC_LOCK
     terminationMessagePath: /dev/termination-log
     terminationMessagePolicy: File
     volumeMounts:
@@ -57,7 +48,7 @@ spec:
       readOnly: true
   dnsPolicy: ClusterFirst
   enableServiceLinks: true
-  nodeName: 
+  nodeName: ubuntu-md-1-kzzml-lmk26-5rkpr
   preemptionPolicy: PreemptLowerPriority
   priority: 0
   restartPolicy: Always
