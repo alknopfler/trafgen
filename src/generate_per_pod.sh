@@ -53,10 +53,11 @@ while getopts ":s:d:p:i:" opt; do
     esac
 done
 
-
 DEST_IPS=($(kubectl get pods -o wide | grep 'client' | awk '{print $6}'))
 SERVER_IPS=($(kubectl get pods -o wide | grep 'server' | awk '{print $6}'))
+
 server_pods=($(kubectl get pods | grep 'server' | awk '{print $1}'))
+client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
 
 if [ ${#server_pods[@]} -ne ${#DEST_IPS[@]} ]; then
     echo "The number of server pods and destination IPs do not match."
@@ -89,4 +90,11 @@ do
         echo "Contents of /tmp/udp.loopback_$PD_SIZE.trafgen on $pod:"
         kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
     fi
+done
+
+for i in "${!client_pods[@]}"
+do
+    pod="${client_pods[$i]}"
+    kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
+    kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
 done

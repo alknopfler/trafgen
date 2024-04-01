@@ -74,11 +74,23 @@ fi
 
 DEFAULT_MONITOR_TIMEOUT=$((DEFAULT_TIMEOUT + DEFAULT_MONITOR_MARGIN))
 
+# loopback ( on same worker node)
 target_pod_name="server0"
 client_pod_name="server1"
 
+# pod to pod ( interpod)
+target_pod_name0="server0"
+client_pod_name0="client0"
+
+target_pod_name1="server1"
+client_pod_name1="client1"
+
+target_pod_name2="server2"
+client_pod_name2="client2"
+
 DEFAULT_INIT_PPS=10000
 trafgen_udp_file="/tmp/udp.loopback_$PD_SIZE.trafgen"
+trafgen_udp_file2="/tmp/udp_$PD_SIZE.trafgen"
 
 target_pod_interface="server0"
 uplink_interface="eth0"
@@ -86,10 +98,24 @@ uplink_interface="eth0"
 tx_pod_name=$(kubectl get pods | grep "$target_pod_name" | awk '{print $1}')
 rx_pod_name=$(kubectl get pods | grep "$client_pod_name" | awk '{print $1}')
 
+tx_pod_name0=$(kubectl get pods | grep "$target_pod_name0" | awk '{print $1}')
+tx_pod_name1=$(kubectl get pods | grep "$target_pod_name1" | awk '{print $1}')
+tx_pod_name2=$(kubectl get pods | grep "$target_pod_name2" | awk '{print $1}')
+
+rx_pod_name0=$(kubectl get pods | grep "$client_pod_name0" | awk '{print $1}')
+rx_pod_name1=$(kubectl get pods | grep "$client_pod_name1" | awk '{print $1}')
+rx_pod_name2=$(kubectl get pods | grep "$client_pod_name2" | awk '{print $1}')
+
 node_name=$(kubectl get pod "$tx_pod_name" -o=jsonpath='{.spec.nodeName}')
 node_ip=$(kubectl get node "$node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
 default_core=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
 default_core_list=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind')
+
+
+#  4/5/6/7  , 7/8/9/10 , 10/11/12/13
+default_core0=$(kubectl exec "$tx_pod_name0" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
+default_core1=$(kubectl exec "$tx_pod_name1" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
+default_core2=$(kubectl exec "$tx_pod_name2" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
 
 if [ -z "$tx_pod_name" ] || [ -z "$node_name" ] || [ -z "$default_core" ]; then
     echo "Pod, node, or first core not found"
@@ -139,10 +165,36 @@ function run_trafgen() {
     trafgen_pid=$!
 }
 
+
+function run_trafgen_inter_pod() {
+    local pps=$1
+    echo "Starting on pod $tx_pod_name0 core $default_core0 with $pps pps for ${DEFAULT_TIMEOUT} sec"
+    kubectl exec "$tx_pod_name0" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core0" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core0" -V -H > /dev/null 2>&1 &
+    trafgen_pid1=$!
+
+    echo "Starting on pod $tx_pod_name1 core $default_core1 with $pps pps for ${DEFAULT_TIMEOUT} sec"
+    kubectl exec "$tx_pod_name1" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core1" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core1" -V -H > /dev/null 2>&1 &
+    trafgen_pid2=$!
+
+    echo "Starting on pod $tx_pod_name2 core $default_core2 with $pps pps for ${DEFAULT_TIMEOUT} sec"
+    kubectl exec "$tx_pod_name2" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core2" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core2" -V -H > /dev/null 2>&1 &
+    trafgen_pid3=$!
+}
+
+
 function run_monitor() {
     echo "Starting monitor pod $tx_pod_name core $default_core"
     kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core"
 }
+
+
+function run_monitor_all() {
+#    echo "Starting monitor pod $tx_pod_name core $default_core"
+    kubectl exec "$rx_pod_name0" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core0"
+#    kubectl exec "$rx_pod_name1" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core1"
+#    kubectl exec "$rx_pod_name2" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core2"
+}
+
 
 # collect metric from both sender and receiver
 function collect_pps_rate() {
@@ -156,6 +208,23 @@ function collect_pps_rate() {
     rx_pod_pid=$!
     kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple -c "$default_core"> "$tx_output_file" &
     tx_pod_pid=$!
+}
+
+
+function collect_pps_rate_all() {
+  local client_pods
+  client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
+  for i in "${!client_pods[@]}"
+  do
+     pod="${client_pods[$i]}"
+     local pps=$1
+     local timestamp=$(date +"%Y%m%d%H%M%S")
+     local rx_output_file="${output_dir}/rx_pod_${pod}_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.txt"
+     echo "Starting collection from pod $pod for core $default_core ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps for RX direction"
+     kubectl exec "$pod" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple> "$rx_output_file" &
+     rx_pod_pid=$!
+  done
+
 }
 
 function get_interface_stats() {
@@ -210,13 +279,16 @@ DEFAULT_INIT_PPS="$OPT_PPS"
 kill_all_trafgen
 
 current_pps="$DEFAULT_INIT_PPS"
-run_trafgen "$current_pps"
+#run_trafgen "$current_pps"
+
+run_trafgen_inter_pod "$current_pps"
 
 #
 if [ "$OPT_MONITOR" = "true" ]; then
-  run_monitor
+  run_monitor_all
 else
-  collect_pps_rate "$current_pps"
+  collect_pps_rate_all "$current_pps"
+#  collect_pps_rate "$current_pps"
 fi
 
 wait
