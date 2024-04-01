@@ -151,7 +151,7 @@ fi
 # Function to generate a range of CPU cores from the physcpubind string
 # Arguments: physcpubind_string num_cores
 # Example usage: generate_core_range "physcpubind: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23" 2
-generate_core_range() {
+function generate_core_range() {
 
     local physcpubind_str=$1
     local num_cores=$2
@@ -173,7 +173,7 @@ generate_core_range() {
 
 # Function to generate a command seperated list of cores
 # Arguments: "2-5" will generate 2,3,4,5
-expand_core_range() {
+function expand_core_range() {
     local core_range=$1
     local start_core
     local end_core
@@ -230,18 +230,21 @@ function run_monitor() {
     kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$task_set_core"
 }
 
-# monitor all pod for multi pod config
+# Monitor all receiver pods
 function run_monitor_all() {
-#    echo "Starting monitor pod $tx_pod_name core $default_core"
-    kubectl exec "$rx_pod_name0" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core0"
-#    kubectl exec "$rx_pod_name1" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core1"
-#    kubectl exec "$rx_pod_name2" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core2"
+  for i in "${!rx_pod_names[@]}"; do
+     local _rx_pod_name=${!rx_pod_names[$i]}
+     local _default_core=${!default_cores[$i]}
+     echo "Starting monitor on pod $rx_pod_name with core $_default_core"
+     kubectl exec "$_rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$_default_core" > "/tmp/monitor_$_rx_pod_name.log" 2>&1 &
+    done
 }
 
 # collect metric from both sender and receiver
 function collect_pps_rate() {
     local pps=$1
-    local timestamp=$(date +"%Y%m%d%H%M%S")
+    local timestamp
+    timestamp=$(date +"%Y%m%d%H%M%S")
     local rx_output_file="${output_dir}/rx_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.txt"
     local tx_output_file="${output_dir}/tx_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.txt"
     echo "Starting collection from pod $rx_pod_name for core $default_core ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps for RX direction"
@@ -306,7 +309,7 @@ function kill_all_trafgen() {
   done
 }
 
-get_and_print_interface_stats() {
+function get_and_print_interface_stats() {
     local interface_name=$1
     interface_stats=$(ssh capv@"$node_ip" cat /proc/net/dev | grep "$interface_name")
     echo "$interface_stats" | while read line; do
@@ -325,8 +328,7 @@ DEFAULT_INIT_PPS="$OPT_PPS"
 kill_all_trafgen
 
 current_pps="$DEFAULT_INIT_PPS"
-
-# in loopback mode monitor or not
+# in loopback mode monitor or collect
 if [ "$OPT_IS_LOOPBACK" = "true" ]; then
   run_trafgen "$current_pps"
   if [ "$OPT_MONITOR" = "true" ]; then
@@ -335,10 +337,16 @@ if [ "$OPT_IS_LOOPBACK" = "true" ]; then
      collect_pps_rate "$current_pps"
   fi
 else
-  # inter-pod collect only
+   # inter-pod monitor or collect.
   run_trafgen_inter_pod "$current_pps"
-  collect_pps_rate_all "$current_pps"
+  if [ "$OPT_MONITOR" = "true" ]; then
+     run_monitor_all
+  else
+     collect_pps_rate_all "$current_pps"
+  fi
 fi
 
 wait
+exit 0
+
 ##kill_all_trafgen
