@@ -31,7 +31,9 @@ while getopts ":i:d:c:h" opt; do
         c)
             CPU_CORE=$OPTARG
             if [[ "$CPU_CORE" =~ "-" ]]; then
+                echo "range core"
                 CPU_CORE=${CPU_CORE%-*}
+                echo "range core $CPU_CORE"
             fi
             ;;
         h)

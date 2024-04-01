@@ -1,6 +1,14 @@
 #!/bin/bash
 # This script start trafgen pod
 # and collect data from generator and receiver pod.
+
+# Usage examples:
+# run
+# -p 10000 10k pps
+# -l local pod to pod
+# -m run monitor mode
+# -c use 2 core
+# ./run_monitor_pps.sh -p 10000 -l -m -c 2
 # Mus
 
 KUBECONFIG_FILE="kubeconfig"
@@ -51,7 +59,7 @@ while getopts ":p:s:mc:l" opt; do
             NUM_CORES=$OPTARG
             ;;
         l)
-           IS_LOOPBACK="true"
+            OPT_IS_LOOPBACK="true"
            ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
@@ -82,44 +90,42 @@ DEFAULT_MONITOR_TIMEOUT=$((DEFAULT_TIMEOUT + DEFAULT_MONITOR_MARGIN))
 target_pod_name="server0"
 client_pod_name="server1"
 
-# pod to pod ( interpod)
-target_pod_name0="server0"
-client_pod_name0="client0"
-
-target_pod_name1="server1"
-client_pod_name1="client1"
-
-target_pod_name2="server2"
-client_pod_name2="client2"
+# pod to pod ( inter pod mapping)
+target_pod_names=("server0" "server1" "server2")
+client_pod_names=("client0" "client1" "client2")
 
 DEFAULT_INIT_PPS=10000
+# loopback profile
 trafgen_udp_file="/tmp/udp.loopback_$PD_SIZE.trafgen"
+# inter pod profile
 trafgen_udp_file2="/tmp/udp_$PD_SIZE.trafgen"
 
 target_pod_interface="server0"
 uplink_interface="eth0"
 
+# single pod to pod loopback test
 tx_pod_name=$(kubectl get pods | grep "$target_pod_name" | awk '{print $1}')
 rx_pod_name=$(kubectl get pods | grep "$client_pod_name" | awk '{print $1}')
 
-tx_pod_name0=$(kubectl get pods | grep "$target_pod_name0" | awk '{print $1}')
-tx_pod_name1=$(kubectl get pods | grep "$target_pod_name1" | awk '{print $1}')
-tx_pod_name2=$(kubectl get pods | grep "$target_pod_name2" | awk '{print $1}')
-
-rx_pod_name0=$(kubectl get pods | grep "$client_pod_name0" | awk '{print $1}')
-rx_pod_name1=$(kubectl get pods | grep "$client_pod_name1" | awk '{print $1}')
-rx_pod_name2=$(kubectl get pods | grep "$client_pod_name2" | awk '{print $1}')
+# multi pod multi node test
+tx_pod_names=()
+rx_pod_names=()
+for i in "${!target_pod_names[@]}"; do
+    tx_pod_names+=($(kubectl get pods | grep "${target_pod_names[$i]}" | awk '{print $1}'))
+    rx_pod_names+=($(kubectl get pods | grep "${client_pod_names[$i]}" | awk '{print $1}'))
+done
 
 node_name=$(kubectl get pod "$tx_pod_name" -o=jsonpath='{.spec.nodeName}')
 node_ip=$(kubectl get node "$node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
 default_core=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
 default_core_list=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind')
+task_set_core=$default_core
 
-
-#  4/5/6/7  , 7/8/9/10 , 10/11/12/13
-default_core0=$(kubectl exec "$tx_pod_name0" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
-default_core1=$(kubectl exec "$tx_pod_name1" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
-default_core2=$(kubectl exec "$tx_pod_name2" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
+default_cores=()
+for _tx_pod_name in "${tx_pod_names[@]}"; do
+    default_core_=$(kubectl exec "$_tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
+    default_cores+=("$default_core")
+done
 
 if [ -z "$tx_pod_name" ] || [ -z "$node_name" ] || [ -z "$default_core" ]; then
     echo "Pod, node, or first core not found"
@@ -132,7 +138,6 @@ else
     echo "Error: Number of cores must be a positive integer current value $NUM_CORES."
     exit 1
 fi
-
 
 # Function to generate a range of CPU cores from the physcpubind string
 # Arguments: physcpubind_string num_cores
@@ -157,48 +162,87 @@ generate_core_range() {
     echo "$core_range"
 }
 
+# Function to generate a command seperated list of cores
+# Arguments: "2-5" will generate 2,3,4,5
+expand_core_range() {
+    local core_range=$1
+    local start_core
+    local end_core
+
+    start_core=$(echo "$core_range" | cut -d'-' -f1)
+    end_core=$(echo "$core_range" | cut -d'-' -f2)
+
+    local core_list=""
+    for (( core = start_core; core <= end_core; core++ )); do
+        if [ -z "$core_list" ]; then
+            core_list="$core"
+        else
+            core_list+=",${core}"
+        fi
+    done
+
+    echo "$core_list"
+}
+
+# If the number of cores is greater than 1,
+# generate a range of cores
+# task_set_core is range 2-4, while default_core is command separated list
 if [ "$NUM_CORES" -gt 1 ]; then
-    default_core=$(generate_core_range "$default_core_list" "$NUM_CORES")
+    task_set_core=$(generate_core_range "$default_core_list" "$NUM_CORES")
+    default_core=$(expand_core_range "$task_set_core")
 fi
 
 # main routine called on start trafgen
 function run_trafgen() {
     local pps=$1
     echo "Starting on pod $tx_pod_name core $default_core with $pps pps for ${DEFAULT_TIMEOUT} sec"
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
     trafgen_pid=$!
 }
 
-
+# Main routine for inter-pod multi pod test
 function run_trafgen_inter_pod() {
     local pps=$1
-    echo "Starting on pod $tx_pod_name0 core $default_core0 with $pps pps for ${DEFAULT_TIMEOUT} sec"
-    kubectl exec "$tx_pod_name0" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core0" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core0" -V -H > /dev/null 2>&1 &
-    trafgen_pid1=$!
-
-    echo "Starting on pod $tx_pod_name1 core $default_core1 with $pps pps for ${DEFAULT_TIMEOUT} sec"
-    kubectl exec "$tx_pod_name1" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core1" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core1" -V -H > /dev/null 2>&1 &
-    trafgen_pid2=$!
-
-    echo "Starting on pod $tx_pod_name2 core $default_core2 with $pps pps for ${DEFAULT_TIMEOUT} sec"
-    kubectl exec "$tx_pod_name2" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core2" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core2" -V -H > /dev/null 2>&1 &
-    trafgen_pid3=$!
+    for i in "${!tx_pod_names[@]}"; do
+        local tx_pod_name="${tx_pod_names[$i]}"
+        local default_core="${default_cores[$i]}"
+        echo "Starting on pod $tx_pod_name with core $default_core and pps $pps for ${DEFAULT_TIMEOUT} sec"
+        kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
+        # Capture the PID of the trafgen process
+        local trafgen_pid_var="trafgen_pid$i"
+        declare $trafgen_pid_var=$!
+    done
 }
 
+#
+#function run_trafgen_inter_pod() {
+#    local pps=$1
+#    echo "Starting on pod $tx_pod_name0 core $default_core0 with $pps pps for ${DEFAULT_TIMEOUT} sec"
+#    kubectl exec "$tx_pod_name0" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core0" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core0" -V -H > /dev/null 2>&1 &
+#    trafgen_pid1=$!
+#
+#    echo "Starting on pod $tx_pod_name1 core $default_core1 with $pps pps for ${DEFAULT_TIMEOUT} sec"
+#    kubectl exec "$tx_pod_name1" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core1" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core1" -V -H > /dev/null 2>&1 &
+#    trafgen_pid2=$!
+#
+#    echo "Starting on pod $tx_pod_name2 core $default_core2 with $pps pps for ${DEFAULT_TIMEOUT} sec"
+#    kubectl exec "$tx_pod_name2" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core2" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core2" -V -H > /dev/null 2>&1 &
+#    trafgen_pid3=$!
+#}
 
+# monitor single pod
 function run_monitor() {
     echo "Starting monitor pod $tx_pod_name core $default_core"
     kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core"
 }
 
-
+# monitor all pod for multi pod config
 function run_monitor_all() {
 #    echo "Starting monitor pod $tx_pod_name core $default_core"
     kubectl exec "$rx_pod_name0" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core0"
 #    kubectl exec "$rx_pod_name1" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core1"
 #    kubectl exec "$rx_pod_name2" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core2"
 }
-
 
 # collect metric from both sender and receiver
 function collect_pps_rate() {
@@ -214,7 +258,8 @@ function collect_pps_rate() {
     tx_pod_pid=$!
 }
 
-
+# Function collect stats from all client pods in multi pod config
+# generated file per pod on rx side.
 function collect_pps_rate_all() {
   local client_pods
   client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
@@ -228,7 +273,6 @@ function collect_pps_rate_all() {
      kubectl exec "$pod" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple> "$rx_output_file" &
      rx_pod_pid=$!
   done
-
 }
 
 function get_interface_stats() {
@@ -250,13 +294,17 @@ function get_interface_stats() {
     ssh capv@"$node_ip" cat /proc/net/dev | grep "$uplink_interface"
 }
 
+# kill all trafgen pids
 function kill_all_trafgen() {
+  local pods
   pods=$(kubectl get pods | grep 'server' | awk '{print $1}')
   for pod in $pods; do
+    local kubectl_pid
     kubectl_pid=$(ps -ef | grep "kubectl exec $pod" | grep -v grep | awk '{print $2}')
     if [[ -n "$kubectl_pid" ]]; then
       kill "$kubectl_pid" > /dev/null 2>&1
     fi
+    local pids
     pids=$(kubectl exec "$pod" -- pgrep -f trafgen)
     if [[ -n "$pids" ]]; then
       kubectl exec "$pod" -- pkill -f trafgen > /dev/null 2>&1
@@ -285,13 +333,13 @@ kill_all_trafgen
 current_pps="$DEFAULT_INIT_PPS"
 
 # in loopback mode monitor or not
-if [ "$IS_LOOPBACK" = "true" ]; then
+if [ "$OPT_IS_LOOPBACK" = "true" ]; then
   run_trafgen "$current_pps"
-      if [ "$OPT_MONITOR" = "true" ]; then
-      run_monitor_all
-    else
-      collect_pps_rate "$current_pps"
-    fi
+  if [ "$OPT_MONITOR" = "true" ]; then
+     run_monitor
+  else
+     collect_pps_rate "$current_pps"
+  fi
 else
   # inter-pod collect only
   run_trafgen_inter_pod "$current_pps"
