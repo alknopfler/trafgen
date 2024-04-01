@@ -1,6 +1,6 @@
 #!/bin/bash
-# This script take path to private key i.e a key that require
-# to connect to worker / controller node.
+# This script take path to a private key i.e a key that require
+# to connect to cluster or worker , controller node.
 # for example VMware TKG uses by default a key that push to all nodes.
 # This one get all worker node get IP of nodes and add in ssh/config private key, so you don't need
 # pass. path to private key when you need ssh to a node.

@@ -28,18 +28,29 @@ e.e. we have a pair of N server-client where each server will send traffic to it
 
 ### Initial setup
 
+```bash
+cd src
+cp your_kubeconfig .
+create_pods.sh
+generate_per_pod.sh
+```
+By default, kubeconfig should be in same spot where all scripts.
+
+Check output 
+
 src/pod-client-template.yaml - template for client pods
 src/pod-server-template.yaml - template for server pods
 src/pod-client-template-same_node.yaml - template for same worker node 
 (Later one in case of bare metal OCP like on single node)
 
+If you run for different cores
+
 ```bash
  pip install numpy
  pip install matplotlib
-
-create_pods.sh
-generate_per_pod.sh
-
+# create_pods.sh
+#generate_per_pod.sh
+./inferece.py
 ```
 
 Generate per pod will output C struct, so you can check that dst mac IP set per pod.

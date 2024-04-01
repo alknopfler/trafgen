@@ -1,11 +1,11 @@
 """
-# take all data generate from monitor.pps load to numpy and plot.
+# Take all data generate from monitor.pps load to numpy and plot.
 # software irq rate vs target ps vs observed pps
 # tx pps vs rx pps,  drop vs pps etc.
+#
 # pip install numpy
 # pip install matplotlib
 # Mus
-
 """
 
 import os
@@ -365,9 +365,10 @@ def plot_stats(
     """plot stats take metric dataset,
     callback that will plot and output dir (optional)
 
-    :param plotter:
-    :param output_dir:
-    :param metric_dataset:
+    :param metric_dataset:  a metric dataset.
+    :param plot_type:  a type i.e. description for a callback what is plotting
+    :param plotter: a callback that will use to plot
+    :param output_dir: a output dir for where we store plots
     :return:
     """
     grouped_experiments = set()
@@ -388,14 +389,24 @@ def plot_stats(
         plotter(metric_dataset, experiment[0], list(experiment[1]), output=output_file)
 
 
-def run_sampling(pps_values):
+def run_sampling(
+        pps_values: list[int],
+        num_cores: list[int]
+):
     """Rn sampling script for each target pps.
     :param pps_values: list of pps value we collect samples for.
+    :param num_cores: num cores to collect samples for.
     :return:
     """
     for pps in pps_values:
-        print(f"Running sampling for {pps} pps...")
-        subprocess.run(['./run_monitor_pps.sh', '-p', str(pps)])
+        for num_core in num_cores:
+            print(f"Running sampling for {pps} pps , core count {num_core} ...")
+            subprocess.run(
+                [
+                    './run_monitor_pps.sh', '-p', str(pps),
+                    '-c', str(num_core)
+                ]
+            )
     print("Sampling completed.")
 
 
@@ -405,7 +416,7 @@ def main(cmd):
     :return:
     """
     if cmd.sample:
-        run_sampling(cmd.pps_values)
+        run_sampling(cmd.pps_values, cmd.cores)
 
     if cmd.output_dir:
         os.makedirs(cmd.output_dir, exist_ok=True)
@@ -430,6 +441,9 @@ if __name__ == "__main__":
     parser.add_argument('--pps_values', nargs='*',
                         type=int, default=[1000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000],
                         help='List of PPS values for sampling')
+    parser.add_argument('--cores', nargs='*',
+                        type=int, default=[1, 2, 3, 4],
+                        help='List of num cores for sampling')
     parser.add_argument('-o', '--output_dir', type=str, help='Output directory for plots')
     args = parser.parse_args()
     main(args)

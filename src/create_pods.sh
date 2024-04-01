@@ -35,7 +35,7 @@ DEFAULT_MEM_REQ="4000Mi"
 DEFAULT_IMAGE="voereir/touchstone-server-ubuntu:v3.11.1"
 OPT_SAME_NODE=false
 
-# number of server-client pair pods
+# Number of server-client pair pods
 NUM_PAIRS=3
 
 display_help() {
