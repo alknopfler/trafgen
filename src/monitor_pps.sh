@@ -1,17 +1,19 @@
 #!/bin/bash
-# This one read stats insider a pod at refresh rate.
+# Scripts read stats inside a pod at sample time (1 second default) rate.
 # note if we need speed this we can write small C code that read that stats.
 # On rx and tx we can run this script to sample TX/RX and all other stats.
 # tuple serialize as comma separate value later passed to numpy hence vectorized
 # do cross correlation.
-# Mus
+#
+# Mus mbayramov@vmware.com
 INTERVAL="1"
 
 display_help() {
     echo "Usage: $0 -i <interface> [-d <direction>] [-c <core>]"
     echo "-i: Specify network interface (required)"
-    echo "-d: Direction to monitor (tx, rx, or tuple), default is rx"
+    echo "-d: Direction to monitor (tx, rx, or tuple), default is empty (monitor mode)"
     echo "-c: CPU core to monitor, default is 0"
+    echo "-s: Sample time in seconds, default is 1"
 }
 
 IF="eth0"
@@ -28,6 +30,9 @@ while getopts ":i:d:c:h" opt; do
             ;;
         c)
             CPU_CORE=$OPTARG
+            if [[ "$CPU_CORE" =~ "-" ]]; then
+                CPU_CORE=${CPU_CORE%-*}
+            fi
             ;;
         h)
             display_help
