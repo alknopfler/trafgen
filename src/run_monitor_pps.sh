@@ -15,6 +15,7 @@ DEFAULT_MONITOR_MARGIN="10"
 OPT_PPS=""
 OPT_SEC=""
 OPT_MONITOR=""
+OPT_IS_LOOPBACK=""
 NUM_CORES="1"
 PACKET_SIZE="64"
 output_dir="metrics"
@@ -32,7 +33,7 @@ function display_help() {
     exit 1
 }
 
-while getopts ":p:s:mc:" opt; do
+while getopts ":p:s:mc:l" opt; do
     case ${opt} in
         p)
             OPT_PPS=$OPTARG
@@ -49,6 +50,9 @@ while getopts ":p:s:mc:" opt; do
         c)
             NUM_CORES=$OPTARG
             ;;
+        l)
+           IS_LOOPBACK="true"
+           ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
             display_help
@@ -279,16 +283,19 @@ DEFAULT_INIT_PPS="$OPT_PPS"
 kill_all_trafgen
 
 current_pps="$DEFAULT_INIT_PPS"
-#run_trafgen "$current_pps"
 
-run_trafgen_inter_pod "$current_pps"
-
-#
-if [ "$OPT_MONITOR" = "true" ]; then
-  run_monitor_all
+# in loopback mode monitor or not
+if [ "$IS_LOOPBACK" = "true" ]; then
+  run_trafgen "$current_pps"
+      if [ "$OPT_MONITOR" = "true" ]; then
+      run_monitor_all
+    else
+      collect_pps_rate "$current_pps"
+    fi
 else
+  # inter-pod collect only
+  run_trafgen_inter_pod "$current_pps"
   collect_pps_rate_all "$current_pps"
-#  collect_pps_rate "$current_pps"
 fi
 
 wait

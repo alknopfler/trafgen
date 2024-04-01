@@ -162,6 +162,7 @@ while true; do
   elif [ "$DIRECTION" = "rx" ]; then
     echo "$RX_PPS"
   elif [ "$DIRECTION" = "tuple" ]; then
+    # collect RX PPS / TX PPS
     echo "$RX_PPS, $TX_PPS, $RX_DROP, $TX_DROP, $RX_ERR, $TX_ERR, $RX_BYTES, $TX_BYTES, $IRQ_RATE, $S_IRQ_RATE, $NET_TX_RATE, $NET_RX_RATE, $CPU_CORE, $CPU_USAGE"
   else
     echo "TX $IF: $TX_PPS pkts/s RX $IF: $RX_PPS pkts/s TX DROP: $TX_DROP pkts/s RX DROP: $RX_DROP pkts/s IRQ Rate: $IRQ_RATE, SIRQ Rate: $S_IRQ_RATE NET_TX_RATE: $NET_TX_RATE, NET_RX_RATE: $NET_RX_RATE AVG_RX_SIZE: $AVG_RX_PACKET_SIZE AVG_TX_SIZE: $AVG_TX_PACKET_SIZE CPU Core $CPU_CORE Usage: $CPU_USAGE%"
