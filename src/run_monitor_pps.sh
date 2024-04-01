@@ -9,6 +9,13 @@
 # -m run monitor mode
 # -c use 2 core
 # ./run_monitor_pps.sh -p 10000 -l -m -c 2
+#
+# Single core loopback pods
+# ./run_monitor_pps.sh -p 10000 -l -m
+#  Will pick up first core and will use it. single core per generation.
+#
+#
+#
 # Mus
 
 KUBECONFIG_FILE="kubeconfig"
@@ -122,9 +129,11 @@ default_core_list=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubin
 task_set_core=$default_core
 
 default_cores=()
+task_sets_cores=()
 for _tx_pod_name in "${tx_pod_names[@]}"; do
     default_core_=$(kubectl exec "$_tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
     default_cores+=("$default_core")
+    task_set_cores+=("$default_core")
 done
 
 if [ -z "$tx_pod_name" ] || [ -z "$node_name" ] || [ -z "$default_core" ]; then
@@ -204,36 +213,21 @@ function run_trafgen() {
 function run_trafgen_inter_pod() {
     local pps=$1
     for i in "${!tx_pod_names[@]}"; do
-        local tx_pod_name="${tx_pod_names[$i]}"
-        local default_core="${default_cores[$i]}"
-        echo "Starting on pod $tx_pod_name with core $default_core and pps $pps for ${DEFAULT_TIMEOUT} sec"
-        kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
+        local _tx_pod_name="${tx_pod_names[$i]}"
+        local _default_core="${default_cores[$i]}"
+        local _task_set_core="${task_set_cores[$i]}"
+        echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec"
+        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$_task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -V -H > /dev/null 2>&1 &
         # Capture the PID of the trafgen process
         local trafgen_pid_var="trafgen_pid$i"
         declare $trafgen_pid_var=$!
     done
 }
 
-#
-#function run_trafgen_inter_pod() {
-#    local pps=$1
-#    echo "Starting on pod $tx_pod_name0 core $default_core0 with $pps pps for ${DEFAULT_TIMEOUT} sec"
-#    kubectl exec "$tx_pod_name0" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core0" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core0" -V -H > /dev/null 2>&1 &
-#    trafgen_pid1=$!
-#
-#    echo "Starting on pod $tx_pod_name1 core $default_core1 with $pps pps for ${DEFAULT_TIMEOUT} sec"
-#    kubectl exec "$tx_pod_name1" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core1" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core1" -V -H > /dev/null 2>&1 &
-#    trafgen_pid2=$!
-#
-#    echo "Starting on pod $tx_pod_name2 core $default_core2 with $pps pps for ${DEFAULT_TIMEOUT} sec"
-#    kubectl exec "$tx_pod_name2" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core2" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core2" -V -H > /dev/null 2>&1 &
-#    trafgen_pid3=$!
-#}
-
 # monitor single pod
 function run_monitor() {
     echo "Starting monitor pod $tx_pod_name core $default_core"
-    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core"
+    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$task_set_core"
 }
 
 # monitor all pod for multi pod config
