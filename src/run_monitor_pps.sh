@@ -135,13 +135,13 @@ fi
 function run_trafgen() {
     local pps=$1
     echo "Starting on pod $tx_pod_name core $default_core with $pps pps for ${DEFAULT_TIMEOUT} sec"
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V > /dev/null 2>&1 &
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$default_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
     trafgen_pid=$!
 }
 
 function run_monitor() {
     echo "Starting monitor pod $tx_pod_name core $default_core"
-    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh eth0 "$default_core"
+    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$default_core"
 }
 
 # collect metric from both sender and receiver
@@ -152,9 +152,9 @@ function collect_pps_rate() {
     local tx_output_file="${output_dir}/tx_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.txt"
     echo "Starting collection from pod $rx_pod_name for core $default_core ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps for RX direction"
 
-    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh eth0 tuple "$default_core"> "$rx_output_file" &
+    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple -c "$default_core"> "$rx_output_file" &
     rx_pod_pid=$!
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh eth0 tuple "$default_core"> "$tx_output_file" &
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple -c "$default_core"> "$tx_output_file" &
     tx_pod_pid=$!
 }
 

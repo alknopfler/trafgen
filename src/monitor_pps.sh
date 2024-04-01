@@ -7,25 +7,57 @@
 # Mus
 INTERVAL="1"
 
-if [ -z "$1" ]; then
-    echo "Usage: $0 [network-interface] [tx|rx|tuple]"
-    echo "Example: $0 eth0 tx"
-    echo "Shows packets-per-second for the specified interface and direction (tx or rx)"
-    exit 1
-fi
+display_help() {
+    echo "Usage: $0 -i <interface> [-d <direction>] [-c <core>]"
+    echo "-i: Specify network interface (required)"
+    echo "-d: Direction to monitor (tx, rx, or tuple), default is rx"
+    echo "-c: CPU core to monitor, default is 0"
+}
 
-
-TOTAL_CORES=$(grep -c ^processor /proc/cpuinfo)
+IF="eth0"
+DIRECTION=""
 CPU_CORE=0
 
-IF="$1"
-DIRECTION="${2:-$DEFAULT_DIRECTION}"
-CPU_CORE="${3:-0}"
+while getopts ":i:d:c:h" opt; do
+    case ${opt} in
+        i)
+            IF=$OPTARG
+            ;;
+        d)
+            DIRECTION=$OPTARG
+            ;;
+        c)
+            CPU_CORE=$OPTARG
+            ;;
+        h)
+            display_help
+            exit 0
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            display_help
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            display_help
+            exit 1
+            ;;
+    esac
+done
+
+TOTAL_CORES=$(grep -c ^processor /proc/cpuinfo)
 
 #if [ "$DIRECTION" != "tx" ] && [ "$DIRECTION" != "rx" ] && [ "$DIRECTION" != "both" ]; then
 #    echo "Invalid direction. Please specify 'tx', 'rx', or omit for both."
 #    exit 1
 #fi
+
+if [ -z "$IF" ] || [ ! -d "/sys/class/net/$IF" ]; then
+    echo "Error: Network interface '$IF' is not valid or does not exist." >&2
+    display_help
+    exit 1
+fi
 
 while true; do
 
@@ -120,6 +152,7 @@ while true; do
   CPU_USAGE=$(((TOTAL_DELTA - IDLE_DELTA) * 100 / TOTAL_DELTA))
 
   if [ "$DIRECTION" = "tx" ]; then
+    echo "rx"
     echo "$TX_PPS"
   elif [ "$DIRECTION" = "rx" ]; then
     echo "$RX_PPS"
