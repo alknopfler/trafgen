@@ -132,8 +132,9 @@ default_cores=()
 task_sets_cores=()
 for _tx_pod_name in "${tx_pod_names[@]}"; do
     default_core_=$(kubectl exec "$_tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
-    default_cores+=("$default_core")
-    task_set_cores+=("$default_core")
+    echo " Allocated for $_tx_pod_name core $default_core_"
+    default_cores+=("$default_core_")
+    task_set_cores+=("$default_core_")
 done
 
 if [ -z "$tx_pod_name" ] || [ -z "$node_name" ] || [ -z "$default_core" ]; then
@@ -236,7 +237,7 @@ function run_monitor_all() {
      local _rx_pod_name=${!rx_pod_names[$i]}
      local _default_core=${!default_cores[$i]}
      echo "Starting monitor on pod $rx_pod_name with core $_default_core"
-     kubectl exec "$_rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$_default_core" > "/tmp/monitor_$_rx_pod_name.log" 2>&1 &
+     kubectl exec "$_rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 > "/tmp/monitor_$_rx_pod_name.log" 2>&1 &
     done
 }
 
@@ -258,13 +259,14 @@ function collect_pps_rate() {
 # Function collect stats from all client pods in multi pod config
 # generated file per pod on rx side.
 function collect_pps_rate_all() {
+  local pps=$1
   local client_pods
   client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
   for i in "${!client_pods[@]}"
   do
      pod="${client_pods[$i]}"
-     local pps=$1
-     local timestamp=$(date +"%Y%m%d%H%M%S")
+     local timestamp
+     timestamp=$(date +"%Y%m%d%H%M%S")
      local rx_output_file="${output_dir}/rx_pod_${pod}_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.txt"
      echo "Starting collection from pod $pod for core $default_core ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps for RX direction"
      kubectl exec "$pod" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple> "$rx_output_file" &
@@ -309,6 +311,8 @@ function kill_all_trafgen() {
   done
 }
 
+# Function allow monitor netdev like eth0/vmxnet3
+# during test execution.
 function get_and_print_interface_stats() {
     local interface_name=$1
     interface_stats=$(ssh capv@"$node_ip" cat /proc/net/dev | grep "$interface_name")
