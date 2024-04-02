@@ -14,9 +14,11 @@
 # ./run_monitor_pps.sh -p 10000 -l -m
 #  Will pick up first core and will use it. single core per generation.
 #
-#
+# Multi-core multi pod ( 2 core per TX pod ) * 3 POD
+# ./run_monitor_pps.sh -p 10000 -m -c 2
 #
 # Mus
+# mbayramov@vwmware.com
 
 KUBECONFIG_FILE="kubeconfig"
 if [ ! -f "$KUBECONFIG_FILE" ]; then
@@ -37,6 +39,52 @@ output_dir="metrics"
 
 DEFAULT_PD_SIZE="22"
 PD_SIZE="$DEFAULT_PD_SIZE"
+
+
+# Function to generate a range of CPU cores from the physcpubind string
+# Arguments: physcpubind_string num_cores
+# Example usage: generate_core_range "physcpubind: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23" 2
+function generate_core_range() {
+
+    local physcpubind_str=$1
+    local num_cores=$2
+    local cores=$(echo "$physcpubind_str" | awk -F': ' '{print $2}')
+
+    IFS=' ' read -r -a cores_array <<< "$cores"
+    local cores_count=${#cores_array[@]}
+
+    if [ "$num_cores" -lt 1 ] || [ "$num_cores" -gt "$cores_count" ]; then
+        echo "Invalid number of cores requested"
+        return 1
+    fi
+
+    local start_idx=$(( (cores_count - num_cores) / 2 ))
+    local end_idx=$(( start_idx + num_cores - 1 ))
+    local core_range="${cores_array[$start_idx]}-${cores_array[$end_idx]}"
+    echo "$core_range"
+}
+
+# Function to generate a command seperated list of cores
+# Arguments: "2-5" will generate 2,3,4,5
+function expand_core_range() {
+    local core_range=$1
+    local start_core
+    local end_core
+
+    start_core=$(echo "$core_range" | cut -d'-' -f1)
+    end_core=$(echo "$core_range" | cut -d'-' -f2)
+
+    local core_list=""
+    for (( core = start_core; core <= end_core; core++ )); do
+        if [ -z "$core_list" ]; then
+            core_list="$core"
+        else
+            core_list+=",${core}"
+        fi
+    done
+
+    echo "$core_list"
+}
 
 function display_help() {
     echo "Usage: $0 -p <pps> [-s <seconds>] [-m] [-c <num_cores>]"
@@ -128,13 +176,24 @@ default_core=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind' | 
 default_core_list=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind')
 task_set_core=$default_core
 
+# array store core per each pod and taskset core range
+# here default_cores is index to a pod idx, same for taskset index is pod idx.
 default_cores=()
-task_sets_cores=()
+task_set_cores=()
 for _tx_pod_name in "${tx_pod_names[@]}"; do
+    # list of core on each tx pod, by default we use single core per tx.
+    pod_default_core_list=$(kubectl exec "$_tx_pod_name" -- numactl -s | grep 'physcpubind')
     default_core_=$(kubectl exec "$_tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
+
+    # if we need more then 1 core per pod for tx
+    if [ "$NUM_CORES" -gt 1 ]; then
+        task_set_core_=$(generate_core_range "$pod_default_core_list" "$NUM_CORES")
+        default_core_=$(expand_core_range "$task_set_core_")
+    fi
+
     echo " Allocated for $_tx_pod_name core $default_core_"
     default_cores+=("$default_core_")
-    task_set_cores+=("$default_core_")
+    task_set_cores+=("$task_set_core_")
 done
 
 if [ -z "$tx_pod_name" ] || [ -z "$node_name" ] || [ -z "$default_core" ]; then
@@ -148,51 +207,6 @@ else
     echo "Error: Number of cores must be a positive integer current value $NUM_CORES."
     exit 1
 fi
-
-# Function to generate a range of CPU cores from the physcpubind string
-# Arguments: physcpubind_string num_cores
-# Example usage: generate_core_range "physcpubind: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23" 2
-function generate_core_range() {
-
-    local physcpubind_str=$1
-    local num_cores=$2
-    local cores=$(echo "$physcpubind_str" | awk -F': ' '{print $2}')
-
-    IFS=' ' read -r -a cores_array <<< "$cores"
-    local cores_count=${#cores_array[@]}
-
-    if [ "$num_cores" -lt 1 ] || [ "$num_cores" -gt "$cores_count" ]; then
-        echo "Invalid number of cores requested"
-        return 1
-    fi
-
-    local start_idx=$(( (cores_count - num_cores) / 2 ))
-    local end_idx=$(( start_idx + num_cores - 1 ))
-    local core_range="${cores_array[$start_idx]}-${cores_array[$end_idx]}"
-    echo "$core_range"
-}
-
-# Function to generate a command seperated list of cores
-# Arguments: "2-5" will generate 2,3,4,5
-function expand_core_range() {
-    local core_range=$1
-    local start_core
-    local end_core
-
-    start_core=$(echo "$core_range" | cut -d'-' -f1)
-    end_core=$(echo "$core_range" | cut -d'-' -f2)
-
-    local core_list=""
-    for (( core = start_core; core <= end_core; core++ )); do
-        if [ -z "$core_list" ]; then
-            core_list="$core"
-        else
-            core_list+=",${core}"
-        fi
-    done
-
-    echo "$core_list"
-}
 
 # If the number of cores is greater than 1,
 # generate a range of cores
@@ -217,7 +231,7 @@ function run_trafgen_inter_pod() {
         local _tx_pod_name="${tx_pod_names[$i]}"
         local _default_core="${default_cores[$i]}"
         local _task_set_core="${task_set_cores[$i]}"
-        echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec"
+        echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec taskset $_task_set_core"
         kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$_task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -V -H > /dev/null 2>&1 &
         # Capture the PID of the trafgen process
         local trafgen_pid_var="trafgen_pid$i"
@@ -231,14 +245,22 @@ function run_monitor() {
     kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$task_set_core"
 }
 
-# Monitor all receiver pods
+# Monitors all receiver pods
+# Each monitor write to own log and function tail all logs
+# in same console
 function run_monitor_all() {
   for i in "${!rx_pod_names[@]}"; do
-     local _rx_pod_name=${!rx_pod_names[$i]}
-     local _default_core=${!default_cores[$i]}
-     echo "Starting monitor on pod $rx_pod_name with core $_default_core"
-     kubectl exec "$_rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 > "/tmp/monitor_$_rx_pod_name.log" 2>&1 &
+     local _rx_pod_name="${rx_pod_names[$i]}"
+     local _default_core="${default_cores[$i]}"
+     echo "Starting monitor on pod $_rx_pod_name with core $_default_core"
+     kubectl exec "$_rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 > "/tmp/monitor_${_rx_pod_name}.log" 2>&1 &
     done
+
+    local tail_cmd="tail -f"
+    for _pod_name_ in "${rx_pod_names[@]}"; do
+        tail_cmd+=" /tmp/monitor_${_pod_name_}.log"
+    done
+    eval "$tail_cmd"
 }
 
 # collect metric from both sender and receiver
