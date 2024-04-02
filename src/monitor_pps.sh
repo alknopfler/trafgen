@@ -16,6 +16,10 @@ display_help() {
     echo "-s: Sample time in seconds, default is 1"
 }
 
+
+#sar -u ALL -P ALL 1
+#tuna --show_irqs
+
 IF="eth0"
 DIRECTION=""
 CPU_CORE=0

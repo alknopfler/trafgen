@@ -68,6 +68,7 @@ for i in "${!server_pods[@]}"
 do
     pod="${server_pods[$i]}"
     dest_ip="${DEST_IPS[$i]}"
+    SRC_PORT=$((1024 + i))
 
     echo "Copying udp template generators to a pod $pod"
     kubectl cp pkt_generate_template.sh "$pod":/tmp/pkt_generate_template.sh
@@ -77,7 +78,7 @@ do
     kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
 
     echo "Executing udp template generator on $pod with pod DEST_IP=$dest_ip payload size ${PD_SIZE} bytes."
-    kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp_$PD_SIZE.trafgen"
+    kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} > /tmp/udp_$PD_SIZE.trafgen"
     echo "Contents of /tmp/udp.trafgen on $pod:"
     kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
 
@@ -86,7 +87,7 @@ do
     if [ "$i" -eq 0 ]; then
         dest_ip_loopback="${SERVER_IPS[1]}"
         echo "Executing loopback profile on $pod with pod DEST_IP=$dest_ip_loopback payload size ${PD_SIZE} bytes."
-        kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} > /tmp/udp.loopback_$PD_SIZE.trafgen"
+        kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} > /tmp/udp.loopback_$PD_SIZE.trafgen"
         echo "Contents of /tmp/udp.loopback_$PD_SIZE.trafgen on $pod:"
         kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
     fi

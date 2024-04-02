@@ -184,6 +184,7 @@ for _tx_pod_name in "${tx_pod_names[@]}"; do
     # list of core on each tx pod, by default we use single core per tx.
     pod_default_core_list=$(kubectl exec "$_tx_pod_name" -- numactl -s | grep 'physcpubind')
     default_core_=$(kubectl exec "$_tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $4}')
+    task_set_core_=default_core_
 
     # if we need more then 1 core per pod for tx
     if [ "$NUM_CORES" -gt 1 ]; then
@@ -232,7 +233,7 @@ function run_trafgen_inter_pod() {
         local _default_core="${default_cores[$i]}"
         local _task_set_core="${task_set_cores[$i]}"
         echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec taskset $_task_set_core"
-        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$_task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -V -H > /dev/null 2>&1 &
+        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$_task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -Q -H > /dev/null 2>&1 &
         # Capture the PID of the trafgen process
         local trafgen_pid_var="trafgen_pid$i"
         declare $trafgen_pid_var=$!
