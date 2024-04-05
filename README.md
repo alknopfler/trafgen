@@ -1,4 +1,4 @@
-# trafgen
+# Benchmarking linux IP stack using trafgen.
 
 ## Instruction
 
@@ -22,7 +22,8 @@ pkt_generate_template later executed. What this script does is first resolve the
 It will perform a single ICMP packet to resolve the ARP cache and arping. It will use the default gateway MAC address
 as the dst MAC address on the generated frame.
 
-Each pod is passed the destination IP address, so we have a 1:1 mapping between the server and the client. i.e., we have a pair of N server clients for which each server will send traffic to its corresponding client.
+Each pod is passed the destination IP address, so we have a 1:1 mapping between the server and the 
+client. i.e., we have a pair of N server clients for which each server will send traffic to its corresponding client.
 
 ### Initial setup
 
