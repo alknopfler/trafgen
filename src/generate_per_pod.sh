@@ -5,6 +5,7 @@
 # - src is base port and each pod offset from that.
 # - dst is base port and each pod offset from that.
 # by default generate for 64 byte packet.
+# It also copies monitor_queue to each worker node.
 # i.e. script inside a POD need to know dst mac / dst ip etc.
 # Mus mbayramov@vmware.com
 
@@ -16,6 +17,9 @@ DEFAULT_PD_SIZE="22"
 SRC_PORT="$DEFAULT_SRC_PORT"
 DST_PORT="$DEFAULT_DST_PORT"
 PD_SIZE="$DEFAULT_PD_SIZE"
+
+target_pod_name="server0"
+client_pod_name="client0"
 
 KUBECONFIG_FILE="kubeconfig"
 if [ ! -f "$KUBECONFIG_FILE" ]; then
@@ -33,12 +37,40 @@ function validate_integer() {
 }
 
 
-display_help() {
+function display_help() {
     echo "Usage: $0 [-s <source port>] [-d <destination port>] [-r] [-i <payload size>]"
     echo "-s: Source port for UDP traffic"
     echo "-d: Destination port for UDP traffic"
     echo "-r: Regenerate monitor_pps.sh script and push"
     echo "-i: Payload size for UDP packets"
+}
+
+function copy_queue_monitor() {
+
+  local tx_node_name
+  local rx_node_name
+  local tx_node_addr
+  local rx_node_addr
+  local tx_pod_full_name
+  local rx_pod_full_name
+
+  # pod name
+  tx_pod_full_name=$(kubectl get pods | grep "$target_pod_name" | awk '{print $1}')
+  rx_pod_full_name=$(kubectl get pods | grep "$client_pod_name" | awk '{print $1}')
+
+  # node name
+  tx_node_name=$(kubectl get pod "$tx_pod_full_name" -o=jsonpath='{.spec.nodeName}')
+  rx_node_name=$(kubectl get pod "$rx_pod_full_name" -o=jsonpath='{.spec.nodeName}')
+
+  # node address
+  tx_node_addr=$(kubectl get node "$tx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+  rx_node_addr=$(kubectl get node "$rx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+
+  echo "Copying monitor_queue_rate script to $tx_node_addr"
+  scp monitor_queue_rate.sh "capv@$tx_node_addr:/tmp/monitor_queue_rate.sh"
+  echo "Copying monitor_queue_rate script to $rx_node_addr"
+  scp monitor_queue_rate.sh "capv@$rx_node_addr:/tmp/monitor_queue_rate.sh"
+
 }
 
 regenerate_monitor=false
@@ -72,6 +104,7 @@ while getopts ":s:d:ri:" opt; do
 done
 shift $((OPTIND -1))
 
+
 DEST_IPS=($(kubectl get pods -o wide | grep 'client' | awk '{print $6}'))
 SERVER_IPS=($(kubectl get pods -o wide | grep 'server' | awk '{print $6}'))
 
@@ -83,7 +116,7 @@ if [ ${#server_pods[@]} -ne ${#DEST_IPS[@]} ]; then
     exit 1
 fi
 
-function copy_monitor() {
+function copy_pps_monitor() {
   local cid
   for cid in "${!client_pods[@]}"; do
     local client_pod
@@ -110,7 +143,8 @@ function copy_monitor() {
 
 # if regeneration we push monitor only
 if "$regenerate_monitor"; then
-  copy_monitor
+  copy_pps_monitor
+  copy_queue_monitor
   exit 1
 fi
 
@@ -147,7 +181,7 @@ execute_in_parallel() {
     wait
 }
 
-# function generate traffic profile on each TX pod
+# Function generate traffic profile on each TX pod
 # for different frame size
 function generate_traffic_profile() {
   local payload_sizes
@@ -164,4 +198,5 @@ function generate_traffic_profile() {
 }
 
 generate_traffic_profile
-copy_monitor
+copy_pps_monitor
+copy_queue_monitor
