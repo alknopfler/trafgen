@@ -15,16 +15,14 @@ perform a set of correlations and visualization.
 ## Usage
 
 First, create pods by running create_pods.sh script. This script will create N server and N client pods. 
-Then run the generate_per_pod.sh script to generate the config for each pod. This script will be 
-copied to each pod
-pkt_generate_template.sh
+Then, run the generate_per_pod.sh script to generate the config for each pod. This script will be 
+copied to each pod  pkt_generate_template.sh
 
 pkt_generate_template later executed. What this script does is first resolve the default gateway IP address.
-It will perform a single ICMP packet to resolve ARP cache and arping. It will use the default gateway mac address
-as the dst mac address on the generated frame.
+It will perform a single ICMP packet to resolve the ARP cache and arping. It will use the default gateway MAC address
+as the dst MAC address on the generated frame.
 
-The destination IP address is passed to each pod, so we have a 1:1 mapping between the server and the client. 
-e.e. we have a pair of N server-client where each server will send traffic to it corresponding client.
+Each pod is passed the destination IP address, so we have a 1:1 mapping between the server and the client. i.e., we have a pair of N server clients for which each server will send traffic to its corresponding client.
 
 ### Initial setup
 
@@ -34,7 +32,23 @@ cp your_kubeconfig .
 create_pods.sh
 generate_per_pod.sh
 ```
+
 By default, kubeconfig should be in same spot where all scripts.
+- generate_per_pod.sh will create 6 pod (default) 3 TX / 3 RX pod.
+- generate_per_pod.sh will create set of profile in tmp dir for 64/128/512/1024 frame size test.
+- serverX is sender, clientX is receiver and it 1:1 pair.
+
+4 pair of server-client will be created.
+
+```bash
+create_pods.sh -n 4
+```
+
+2 pair 2 core per pod 2 GB memory per pod
+
+```bash
+create_pods.sh -n 4 -c 2 -m 2
+```
 
 Check output 
 
@@ -51,6 +65,34 @@ If you run for different cores
 # create_pods.sh
 #generate_per_pod.sh
 ./inferece.py
+```
+
+## Running monitor
+
+Default setting will use 1 core, 64 byte frame size profile and 3 pair.  '-m' will tell script to output to stdout
+and sample every 1 sec metrics.
+
+```bash
+./run_monitor_ssh.sh -p 1000 -m
+```
+
+Two core per pod default 3 pair.
+
+```bash
+./run_monitor_ssh.sh -p 1000 -m -c 2
+```
+
+4 core per pod 4 pair in monitor mode
+
+```bash
+./run_monitor_ssh.sh -p 1000 -m -c 2 -n 4
+```
+
+4 core per pod 4 pair in collector mode. 
+( without -m script will collect on TX and RX pods and write separate files)
+
+```bash
+./run_monitor_ssh.sh -p 1000 -c 2 -n 4
 ```
 
 Generate per pod will output C struct, so you can check that dst mac IP set per pod.

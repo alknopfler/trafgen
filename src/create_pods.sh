@@ -9,10 +9,11 @@
 # Note It uses pod template file to populate name node name etc.
 # note by default it pick up two node one used for server
 # one for client i.e. affinity set in way so server on worker a client on b
-# if pass arg it will deploy all pod on same node. Note by default it doesn't use control
-# you can remove that check if needed.
+# if pass arg it will deploy all pod on same node.
 #
-# -c arg set CPU , -n num pairs.
+# Note: by default it doesn't use control you can remove that check if needed.
+#
+# -c arg set CPU, -n num pairs.
 
 # In case we have worker node and control plane node, on same node.
 # Use -s flag so all pods deployed on same node.
