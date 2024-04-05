@@ -71,6 +71,8 @@ function copy_queue_monitor() {
   echo "Copying monitor_queue_rate script to $rx_node_addr"
   scp monitor_queue_rate.sh "capv@$rx_node_addr:/tmp/monitor_queue_rate.sh"
 
+  scp monitor_txrx_int.sh "capv@$tx_node_addr:/tmp/monitor_txrx_int.sh"
+  scp monitor_txrx_int.sh "capv@$rx_node_addr:/tmp/monitor_txrx_int.sh"
 }
 
 regenerate_monitor=false

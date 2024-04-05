@@ -41,7 +41,7 @@ while true; do
 
   sleep "$INTERVAL"
 
-  ethtool_output=$(ssh capv@198.19.57.175 ethtool -S eth0)
+  ethtool_output=$(ethtool -S eth0)
   if [[ $? -ne 0 || -z $ethtool_output ]]; then
       echo "Error: Unable to fetch ethtool counters for eth0."
       exit 1
