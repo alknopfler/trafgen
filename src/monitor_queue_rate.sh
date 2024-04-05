@@ -1,4 +1,13 @@
 #!/bin/bash
+# This script sample TX and RX queue pkt per second (pps)
+# counters of adapter the main purpose identify imbalance
+# either on TX or RX.
+#
+# generate per pod script will copy this script to each worker node under /tmp
+# during run we execute this script and sample.
+#
+# Author Mus
+# mbayramov@vmware.com
 
 INTERVAL="1"
 
@@ -18,8 +27,10 @@ if [[ $? -ne 0 || -z $ethtool_output ]]; then
     exit 1
 fi
 
+# sample ucast pkts tx/rx per queue each sample time
+# calculate rate per queue
 while true; do
-  ethtool_output=$(ssh capv@198.19.57.175 ethtool -S eth0)
+  ethtool_output=$(ethtool -S eth0)
   if [[ $? -ne 0 || -z $ethtool_output ]]; then
       echo "Error: Unable to fetch ethtool counters for eth0."
       exit 1
