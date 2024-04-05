@@ -1,6 +1,10 @@
 #!/bin/bash
 # Generate trafgen config per pod
 # This script execute script inside each container and populate two trafgen files.
+#
+# - src is base port and each pod offset from that.
+# - dst is base port and each pod offset from that.
+# by default generate for 64 byte packet.
 # i.e. script inside a POD need to know dst mac / dst ip etc.
 # Mus mbayramov@vmware.com
 
@@ -20,26 +24,40 @@ if [ ! -f "$KUBECONFIG_FILE" ]; then
 fi
 export KUBECONFIG="$KUBECONFIG_FILE"
 
-display_help() {
-    echo "Usage: $0 [-s <source port>] [-d <destination port>] [-p <payload size>]"
-    echo "-s: Source port for UDP traffic"
-    echo "-d: Destination port for UDP traffic"
-    echo "-p: Payload size for UDP packets"
+function validate_integer() {
+    local re
+    re='^[0-9]+$'
+    if ! [[ $1 =~ $re ]] ; then
+        echo "Error: Number must must be a positive integer." >&2; exit 1
+    fi
 }
 
-while getopts ":s:d:p:i:" opt; do
+
+display_help() {
+    echo "Usage: $0 [-s <source port>] [-d <destination port>] [-r] [-i <payload size>]"
+    echo "-s: Source port for UDP traffic"
+    echo "-d: Destination port for UDP traffic"
+    echo "-r: Regenerate monitor_pps.sh script and push"
+    echo "-i: Payload size for UDP packets"
+}
+
+regenerate_monitor=false
+while getopts ":s:d:ri:" opt; do
     case ${opt} in
         s)
+            validate_integer "$OPTARG"
             SRC_PORT=$OPTARG
             ;;
         d)
+            validate_integer "$OPTARG"
             DST_PORT=$OPTARG
             ;;
-        p)
-            PD_SIZE=$OPTARG
+        r)
+            regenerate_monitor=true
             ;;
         i)
-            DEST_IP=$OPTARG
+            validate_integer "$OPTARG"
+            PD_SIZE=$OPTARG
             ;;
         \?)
             display_help
@@ -52,6 +70,7 @@ while getopts ":s:d:p:i:" opt; do
             ;;
     esac
 done
+shift $((OPTIND -1))
 
 DEST_IPS=($(kubectl get pods -o wide | grep 'client' | awk '{print $6}'))
 SERVER_IPS=($(kubectl get pods -o wide | grep 'server' | awk '{print $6}'))
@@ -64,38 +83,85 @@ if [ ${#server_pods[@]} -ne ${#DEST_IPS[@]} ]; then
     exit 1
 fi
 
-for i in "${!server_pods[@]}"
-do
-    pod="${server_pods[$i]}"
-    dest_ip="${DEST_IPS[$i]}"
-    SRC_PORT=$((1024 + i))
+function copy_monitor() {
+  local cid
+  for cid in "${!client_pods[@]}"; do
+    local client_pod
+    client_pod="${client_pods[$cid]}"
+    echo "Copying monitor script to $client_pod"
+    (
+      kubectl cp monitor_pps.sh "$client_pod":/tmp/monitor_pps.sh
+      kubectl exec "$client_pod" -- chmod +x /tmp/monitor_pps.sh
+    ) &
+  done
 
-    echo "Copying udp template generators to a pod $pod"
-    kubectl cp pkt_generate_template.sh "$pod":/tmp/pkt_generate_template.sh
-    kubectl exec "$pod" -- chmod +x /tmp/pkt_generate_template.sh
+  local sid
+  for sid in "${!server_pods[@]}"; do
+    local server_pod
+    server_pod="${server_pods[$sid]}"
+    echo "Copying monitor script to $server_pod"
+    (
+      kubectl cp monitor_pps.sh "$server_pod":/tmp/monitor_pps.sh
+      kubectl exec "$server_pod" -- chmod +x /tmp/monitor_pps.sh
+    ) &
+  done
+  wait
+}
 
-    kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
-    kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
+# if regeneration we push monitor only
+if "$regenerate_monitor"; then
+  copy_monitor
+  exit 1
+fi
 
-    echo "Executing udp template generator on $pod with pod DEST_IP=$dest_ip payload size ${PD_SIZE} bytes."
-    kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} > /tmp/udp_$PD_SIZE.trafgen"
-    echo "Contents of /tmp/udp.trafgen on $pod:"
-    kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
+# Function to execute commands in parallel in all pods
+# It uses array of DEST_IPS which must hold client IP addresses
+execute_in_parallel() {
+    local pods=("$@")
+    local pod_id=0
+    local pod
+    for pod in "${pods[@]}"; do
+          local dst_addr
+          dst_addr="${DEST_IPS[$pod_id]}"
+          SRC_PORT=$((1024 + pod_id))
+          DST_PORT=$((1024 + pod_id))
+        (
+            kubectl cp pkt_generate_template.sh "$pod":/tmp/pkt_generate_template.sh
+            kubectl exec "$pod" -- chmod +x /tmp/pkt_generate_template.sh
 
-    # loopback profile for the first server pod to
-    # use the second server pod as destination. ( this executed only once )
-    if [ "$i" -eq 0 ]; then
-        dest_ip_loopback="${SERVER_IPS[1]}"
-        echo "Executing loopback profile on $pod with pod DEST_IP=$dest_ip_loopback payload size ${PD_SIZE} bytes."
-        kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} > /tmp/udp.loopback_$PD_SIZE.trafgen"
-        echo "Contents of /tmp/udp.loopback_$PD_SIZE.trafgen on $pod:"
-        kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
-    fi
-done
+            kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
+            kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
+            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp_$PD_SIZE.trafgen"
+            kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
 
-for i in "${!client_pods[@]}"
-do
-    pod="${client_pods[$i]}"
-    kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
-    kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
-done
+            # loopback profile for the first server pod to
+            # use the second server pod as destination. ( this executed only once )
+            if [ "$pod_id" -eq 0 ]; then
+                dest_ip_loopback="${SERVER_IPS[1]}"
+                kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp.loopback_$PD_SIZE.trafgen"
+                kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
+            fi
+        ) &
+        ((pod_id++))
+    done
+    wait
+}
+
+# function generate traffic profile on each TX pod
+# for different frame size
+function generate_traffic_profile() {
+  local payload_sizes
+    payload_sizes=(64 128 512 1024)
+    local frame_size
+    for frame_size in "${payload_sizes[@]}"; do
+        echo "Generating profile for frame size ${frame_size} bytes"
+        # Ethernet header (14 bytes), IP header (20 bytes), and UDP header (8 bytes)
+        local payload_size
+        payload_size=$((frame_size - 14 - 20 - 8))
+        PD_SIZE="$payload_size"
+        execute_in_parallel "${server_pods[@]}"
+    done
+}
+
+generate_traffic_profile
+copy_monitor
