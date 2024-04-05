@@ -1,18 +1,24 @@
 #!/bin/bash
-# Create server and client pods by reading two POD template files.
-# it set target image, and other parameters.
+# I use this script to create server and client pods. It read template file for
+# two POD template files, and it set target image, and other parameters
+# for a pod.
 #
-# Note it doesn't read default KUBECONFIG to avoid dodgy case
-# hence put kubeconfig in same spot where is script.
+# Note it doesn't read default KUBECONFIG to avoid dodgy case.
+# Hence, put kubeconfig in same spot where is script.
 #
 # Note It uses pod template file to populate name node name etc.
 # note by default it pick up two node one used for server
 # one for client i.e. affinity set in way so server on worker a client on b
 # if pass arg it will deploy all pod on same node. Note by default it doesn't use control
 # you can remove that check if needed.
+#
+# -c arg set CPU , -n num pairs.
 
-# This one for OCP same node
-# Mus
+# In case we have worker node and control plane node, on same node.
+# Use -s flag so all pods deployed on same node.
+#
+# Author Mus
+# mbayramov@vmware.com
 
 KUBECONFIG_FILE="kubeconfig"
 if [ ! -f "$KUBECONFIG_FILE" ]; then
@@ -35,22 +41,47 @@ DEFAULT_MEM_REQ="4000Mi"
 DEFAULT_IMAGE="voereir/touchstone-server-ubuntu:v3.11.1"
 OPT_SAME_NODE=false
 
-# Number of server-client pair pods
-NUM_PAIRS=3
+# Number of TX-RX pair pods
+DEFAULT_NUM_PAIRS=3
 
-display_help() {
-    echo "Usage: $0 [-s] [-i <image>]"
-    echo "-s: Deploy client on the same node as server"
-    echo "-i: Specify custom image for server and client"
+function display_help() {
+    echo "Usage: $0 [-s] [-i <image>] [-n <num_pairs>]"
+    echo "-s: Deploy client on the same node as the server"
+    echo "-i: Specify a custom image for the server and client (default: $DEFAULT_IMAGE)"
+    echo "-c: Specify the CPU limit for each pod (default: $DEFAULT_CPU_LIMIT)"
+    echo "-n: Specify the number of server-client pairs (default: $DEFAULT_NUM_PAIRS)"
+    echo "-m: Specify the memory limit for each pod in MiB (default: $DEFAULT_MEM_LIMIT)"
 }
 
-while getopts ":si:" opt; do
+function validate_integer() {
+    local re
+    re='^[0-9]+$'
+    if ! [[ $1 =~ $re ]] ; then
+        echo "Error: Number must must be a positive integer." >&2; exit 1
+    fi
+}
+
+while getopts ":si:n:c:m:" opt; do
     case ${opt} in
         s)
             OPT_SAME_NODE="true"
             ;;
         i)
             CUSTOM_IMAGE=$OPTARG
+            ;;
+        n)
+            validate_integer "$OPTARG"
+            DEFAULT_NUM_PAIRS=$OPTARG
+            ;;
+        c)
+            validate_integer "$OPTARG"
+            DEFAULT_CPU_LIMIT=$OPTARG
+            DEFAULT_CPU_REQ=$DEFAULT_CPU_LIMIT
+            ;;
+        m)
+            validate_integer "$OPTARG"
+            DEFAULT_MEM_LIMIT="${OPTARG}Mi"
+            DEFAULT_MEM_REQ=$DEFAULT_MEM_LIMIT
             ;;
         \?)
             display_help
@@ -65,6 +96,14 @@ while getopts ":si:" opt; do
 done
 
 shift $((OPTIND -1))
+
+echo -e "Pod Configuration Information:\n\
+Memory Limit:\t\t$DEFAULT_MEM_LIMIT\n\
+Memory Request:\t\t$DEFAULT_MEM_REQ\n\
+CPU Request:\t\t$DEFAULT_CPU_REQ\n\
+CPU Limit:\t\t$DEFAULT_CPU_LIMIT\n\
+Number of Server-Client Pairs:\t$DEFAULT_NUM_PAIRS"
+
 
 if [ ! -z "$CUSTOM_IMAGE" ]; then
     DEFAULT_IMAGE="$CUSTOM_IMAGE"
@@ -82,7 +121,7 @@ else
     client_node=$server_node
 fi
 
-for i in $(seq 0 $((NUM_PAIRS - 1)))
+for i in $(seq 0 $((DEFAULT_NUM_PAIRS - 1)))
 do
     server_name="server$i"
     client_name="client$i"
