@@ -25,6 +25,26 @@ as the dst MAC address on the generated frame.
 Each pod is passed the destination IP address, so we have a 1:1 mapping between the server and the 
 client. i.e., we have a pair of N server clients for which each server will send traffic to its corresponding client.
 
+- create_pods.sh - create pod executed from compute that has access to kubeconfig.
+- generate_per_pod.sh - generate per pod config executed from compute that has access to kubeconfig.
+- run_monitor.sh - run monitor script executed from compute that has access to kubeconfig.
+- inference.py - inference script executed from compute that has access to kubeconfig.
+- pkt_generate_template.sh - executed inside each pod ( called by generate_per_pod.sh)
+- monitor_queue_rate.sh - executed inside each worker node ( i.e. script pushed to each worker node)
+- monitor_txrx_int.sh - executed inside each worker node ( i.e. script pushed to each worker node)
+
+- pkt_generate_template.sh - pushed to each pod
+- monitor_pps.sh - pushed to each pod
+- monitor_queue_rate.sh - pushed to each worker node
+- monitor_txrx_int.sh - pushed to each worker node
+
+## Purpose
+
+- pkt_generate_template create all udp flow template, it needs access to src mac/dst mac, arp cache to generate right templates.
+- monitor_pps.sh - monitor script that will collect data from each pod, so we have viewed on TX / RX , interrupts , IRQ etc.
+- monitor_queue_rate.sh - identify TX or RX queue load in balance.
+- monitor_txrx_int.sh - identify TX / RX interrupts load and separation and balance.
+
 ### Initial setup
 
 ```bash
