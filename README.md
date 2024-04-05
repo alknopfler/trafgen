@@ -25,6 +25,8 @@ as the dst MAC address on the generated frame.
 Each pod is passed the destination IP address, so we have a 1:1 mapping between the server and the 
 client. i.e., we have a pair of N server clients for which each server will send traffic to its corresponding client.
 
+## Scripts
+
 - create_pods.sh - create pod executed from compute that has access to kubeconfig.
 - generate_per_pod.sh - generate per pod config executed from compute that has access to kubeconfig.
 - run_monitor.sh - run monitor script executed from compute that has access to kubeconfig.
