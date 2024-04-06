@@ -53,12 +53,14 @@ function validate_integer() {
     fi
 }
 
+# Function to check that the server-client pairs are running
 function check_server_client_pairs() {
     local server_name
     local client_name
     local num_pairs
     num_pairs=$1
 
+    local pod_id
     for pod_id in $(seq 0 $((num_pairs - 1))); do
         server_name="server$pod_id"
         client_name="client$pod_id"
@@ -368,18 +370,25 @@ function collect_pps_rate() {
 # Function collect stats from all client pods in multi pod config
 # generated file per pod on rx side.
 function collect_pps_rate_all() {
+
   local pps=$1
   local client_pods
   client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
+
   for i in "${!client_pods[@]}"
   do
      pod="${client_pods[$i]}"
      local timestamp
+     local _target_core
      timestamp=$(date +"%Y%m%d%H%M%S")
-     local rx_output_file="${output_dir}/rx_pod_${pod}_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.txt"
+     _target_core="${default_cores[$i]}"
+
+     local rx_output_file="${output_dir}/rx_pod_${pod}_${pps}pps_${DEFAULT_TIMEOUT}_core_${_target_core}_size_${PACKET_SIZE}_${timestamp}.txt"
      echo "Starting collection from pod $pod for core $default_core ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps for RX direction"
+
      kubectl exec "$pod" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple> "$rx_output_file" &
      rx_pod_pid=$!
+
   done
 }
 
@@ -396,6 +405,46 @@ function get_interface_stats() {
 function get_interface_stats() {
     ssh capv@"$tx_node_addr" cat /proc/net/dev | grep antrea-gw0
 }
+
+# Function collect queue rate per TX and RX
+function collect_queue_rates() {
+    local timestamp
+    timestamp=$(date +"%Y%m%d%H%M%S")
+
+    local tx_output_file="${output_dir}/queue_rate_tx_${timestamp}.log"
+    echo "Collecting queue rate from tx_node at $timestamp..."
+    ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_queue_rate.sh > "$tx_output_file" &
+    tx_node_pid=$!
+
+    local rx_output_file="${output_dir}/queue_rate_rx_${timestamp}.log"
+    echo "Collecting queue rate from rx_node at $timestamp..."
+    ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_queue_rate.sh > "$rx_output_file" &
+    rx_node_pid=$!
+
+#    wait $tx_node_pid
+#    wait $rx_node_pid
+}
+
+
+# function collect interrupt rate per TX and RX
+function collect_tx_rx_int() {
+    local timestamp
+    timestamp=$(date +"%Y%m%d%H%M%S")
+
+    local tx_output_file="${output_dir}/tx_rx_int_tx_${timestamp}.log"
+    echo "Collecting TX/RX interrupt data from tx_node at $timestamp..."
+    ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_txrx_int.sh > "$tx_output_file" &
+    tx_node_pid=$!
+
+    local rx_output_file="${output_dir}/tx_rx_int_rx_${timestamp}.log"
+    echo "Collecting TX/RX interrupt data from rx_node at $timestamp..."
+    ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_txrx_int.sh > "$rx_output_file" &
+    rx_node_pid=$!
+
+#    wait $tx_node_pid
+#    wait $rx_node_pid
+}
+
 
 # this a pod interface stats for uplink
 function get_interface_stats() {
@@ -441,6 +490,7 @@ echo " - Starting $DEFAULT_NUM_PAIRS pair, traffic generator with $OPT_PPS pps f
 DEFAULT_INIT_PPS="$OPT_PPS"
 kill_all_trafgen
 
+
 current_pps="$DEFAULT_INIT_PPS"
 # in loopback mode monitor or collect
 if [ "$OPT_IS_LOOPBACK" = "true" ]; then
@@ -457,7 +507,9 @@ else
   if [ "$OPT_MONITOR" = "true" ]; then
      run_monitor_all
   else
-     collect_pps_rate_all "$current_pps"
+     collect_pps_rate_all "$current_pps" &
+     collect_queue_rates &
+     collect_tx_rx_int &
   fi
 fi
 

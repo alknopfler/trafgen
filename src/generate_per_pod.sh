@@ -45,8 +45,16 @@ function display_help() {
     echo "-i: Payload size for UDP packets"
 }
 
-function copy_queue_monitor() {
+function check_kube_connection() {
+    if ! kubectl cluster-info &> /dev/null; then
+        echo "Error: Unable to connect to the Kubernetes cluster. Please check your connection or kubeconfig settings."
+        exit 1
+    fi
+}
 
+check_kube_connection
+
+function copy_queue_monitor() {
   local tx_node_name
   local rx_node_name
   local tx_node_addr

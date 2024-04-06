@@ -1,13 +1,13 @@
 #!/bin/bash
 # This script sample interrupts for target adapter.
-# Note I did not test anything outside vmxnet3.
+# Note I did not test anything outside VMXNET3.
 #
 # Author Mus
 # mbayramov@vmware.com
 
 OPT_MONITOR=""
 INTERVAL=1
-interface_name="eth0"
+IF_NAME="eth0"
 
 function display_help() {
   echo "Usage: $0 <interface_name> [-i <interface_name>] [-m]"
@@ -19,26 +19,30 @@ function display_help() {
 }
 
 while getopts "mi:" opt; do
-    case ${opt} in
-        i)
-          OPT_IF="$OPTARG"
-          ;;
-        m)
-            OPT_MONITOR="true"
-            ;;
-        \?)
-            echo "Invalid option: -$OPTARG" >&2
-            display_help
-            ;;
-        :)
-            echo "Option -$OPTARG requires an argument." >&2
-            display_help
-            ;;
-    esac
+  case ${opt} in
+  i)
+    IF_NAME="$OPTARG"
+    ;;
+  m)
+    OPT_MONITOR="true"
+    ;;
+  \?)
+    echo "Invalid option: -$OPTARG" >&2
+    display_help
+    ;;
+  :)
+    echo "Option -$OPTARG requires an argument." >&2
+    display_help
+    ;;
+  esac
 done
-shift $((OPTIND -1))
+shift $((OPTIND - 1))
 
-interface_name="$1"
+ethtool_output=$(ethtool -S "$IF_NAME")
+if [[ $? -ne 0 || -z $ethtool_output ]]; then
+  echo "Error: Unable to fetch ethtool counters for $IF_NAME."
+  exit 1
+fi
 
 # store list of core for particular rxtx
 interrupts_core_array=()
@@ -61,11 +65,12 @@ interrupts_val_array=()
 #  0 0 0 0 0 0 32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 4991357 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 function tx_rx_interrupts() {
 
-  readarray -t cores_array < <(cat /proc/interrupts | awk -v iface="$interface_name" '$0 ~ iface { $1 = ""; sub(/IR-PCI-MSI /, ""); print substr($0, 2, length($0) - 26) }')
-
+  readarray -t cores_array < <(cat /proc/interrupts | awk -v iface="$IF_NAME" \
+  '$0 ~ iface { $1 = ""; sub(/IR-PCI-MSI /, ""); print substr($0, 2, length($0) - 26) }')
   local _out_line
-  for _out_line in "${cores_array[@]}"; do
 
+  for _out_line in "${cores_array[@]}"; do
+    local values
     read -ra values <<<"$_out_line"
     local rxtx_id
 
@@ -89,13 +94,18 @@ function tx_rx_interrupts() {
 # in collect mode we output entire vector with N col
 # where col is cpu ID
 function collect() {
-    readarray -t cores_array < <(cat /proc/interrupts | awk -v iface="$interface_name" '$0 ~ iface { $1 = ""; sub(/IR-PCI-MSI /, ""); print substr($0, 2, length($0) - 26) }')
+  while true; do
+    readarray -t cores_array < <(cat /proc/interrupts | awk -v iface="$IF_NAME" \
+      '$0 ~ iface { $1 = ""; sub(/IR-PCI-MSI /, ""); print substr($0, 2, length($0) - 26) }')
+    local out_line
     for out_line in "${cores_array[@]}"; do
-        echo "$out_line"
+      echo "$out_line"
     done
+    sleep "$INTERVAL"
+  done
 }
 
-# function monitor interrupts
+# function monitor interrupts counter for each rxtx queue
 # and output adapter interrupts and cpu id per rxtx queue
 function monitor() {
   while true; do
@@ -123,4 +133,3 @@ if [ "$OPT_MONITOR" = "true" ]; then
 else
   collect
 fi
-
