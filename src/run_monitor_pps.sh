@@ -392,11 +392,12 @@ function collect_pps_rate_all() {
   done
 }
 
+# Function to get the interface stats from the TX node
 function get_interface_stats() {
     ssh capv@"$tx_node_addr" cat /proc/net/dev | grep 'genev_sys'
 }
 
-# this a pod interface server0--63ab25
+# This a pod interface server0--63ab25
 function get_interface_stats() {
     ssh capv@"$tx_node_addr" cat /proc/net/dev | grep $target_pod_name
 }
@@ -406,45 +407,45 @@ function get_interface_stats() {
     ssh capv@"$tx_node_addr" cat /proc/net/dev | grep antrea-gw0
 }
 
-# Function collect queue rate per TX and RX
+# Function collect queue rate per TX and RX from
+# TX and RX worker node
 function collect_queue_rates() {
+    local pps=$1
+    local num_cores=$2
+    local num_pairs=$3
+    local packet_size=$4
+
     local timestamp
     timestamp=$(date +"%Y%m%d%H%M%S")
 
-    local tx_output_file="${output_dir}/queue_rate_tx_${timestamp}.log"
+    local tx_output_file="${output_dir}/queue_rate_tx_${pps}pps_${num_cores}cores_${num_pairs}pairs_${packet_size}pkt_${timestamp}.log"
     echo "Collecting queue rate from tx_node at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_queue_rate.sh > "$tx_output_file" &
-    tx_node_pid=$!
 
-    local rx_output_file="${output_dir}/queue_rate_rx_${timestamp}.log"
+    local rx_output_file="${output_dir}/queue_rate_rx_${pps}pps_${num_cores}cores_${num_pairs}pairs_${packet_size}pkt_${timestamp}.log"
     echo "Collecting queue rate from rx_node at $timestamp..."
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_queue_rate.sh > "$rx_output_file" &
-    rx_node_pid=$!
-
-#    wait $tx_node_pid
-#    wait $rx_node_pid
 }
 
-
-# function collect interrupt rate per TX and RX
+# Function collect interrupt rate per TX and RX
+# from each worker node.
 function collect_tx_rx_int() {
+    local pps=$1
+    local num_cores=$2
+    local num_pairs=$3
+    local packet_size=$4
+
     local timestamp
     timestamp=$(date +"%Y%m%d%H%M%S")
 
-    local tx_output_file="${output_dir}/tx_rx_int_tx_${timestamp}.log"
+    local tx_output_file="${output_dir}/tx_rx_int_tx_${pps}pps_${num_cores}cores_${num_pairs}pairs_${packet_size}pkt_${timestamp}.log"
     echo "Collecting TX/RX interrupt data from tx_node at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_txrx_int.sh > "$tx_output_file" &
-    tx_node_pid=$!
 
-    local rx_output_file="${output_dir}/tx_rx_int_rx_${timestamp}.log"
+    local rx_output_file="${output_dir}/tx_rx_int_rx_${pps}pps_${num_cores}cores_${num_pairs}pairs_${packet_size}pkt_${timestamp}.log"
     echo "Collecting TX/RX interrupt data from rx_node at $timestamp..."
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" monitor_txrx_int.sh > "$rx_output_file" &
-    rx_node_pid=$!
-
-#    wait $tx_node_pid
-#    wait $rx_node_pid
 }
-
 
 # this a pod interface stats for uplink
 function get_interface_stats() {
@@ -508,8 +509,8 @@ else
      run_monitor_all
   else
      collect_pps_rate_all "$current_pps" &
-     collect_queue_rates &
-     collect_tx_rx_int &
+     collect_queue_rates "$current_pps" "$NUM_CORES" "$DEFAULT_NUM_PAIRS" "$PACKET_SIZE" &
+     collect_tx_rx_int "$current_pps" "$NUM_CORES" "$DEFAULT_NUM_PAIRS" "$PACKET_SIZE" &
   fi
 fi
 
