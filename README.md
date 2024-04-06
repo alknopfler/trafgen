@@ -161,6 +161,56 @@ TX eth0: 1 pkts/s RX eth0: 1000 pkts/s TX DROP: 0 pkts/s RX DROP: 0 pkts/s IRQ R
 
 ### Data collection.
 
+During collection mode, we schedule the operation to monitor N pairs of server and client pods 
+while simultaneously initiating traffic generation. Throughout this process, we gather logs from both 
+the server and client pods. The data is preprocessed for efficient loading into numpy, optimized to 
+function as a vector of observations.
+
+Concurrently, we collect the rate of observations on each Transmission (TX) and Reception (RX) queue, 
+monitoring their status per queue. Additionally, we gather interrupt rates per TX and RX queue per CPU.
+
+All these logs are generated under the "metrics" directory.
+
+Example
+
+In collect mode for 2 pair
+client_client0-ve-56377f29-e603-11ee-a122-179ee4765847_1000pps_120_core_6_size_64_20240406043813.txt
+client_client1-ve-56377f29-e603-11ee-a122-179ee4765847_1000pps_120_core_6_size_64_20240406043813.txt
+
+server_server0-ve-56377f29-e603-11ee-a122-179ee4765847_1000pps_120_core_6_size_64_20240406043813.txt
+server_server1-ve-56377f29-e603-11ee-a122-179ee4765847_1000pps_120_core_6_size_64_20240406043813.txt
+
+Stats for each queue in TX and RX pod are in logs
+
+queue_rate_rx_1000pps_1cores_3pairs_64pkt_20240406043811.log
+queue_rate_tx_1000pps_1cores_3pairs_64pkt_20240406043811.log
+
+The data in log describe first 8 columns 
+are for TX and next 8 columns are for RX pod.
+
+```bash
+1 1 0 6 2 5 8 7 1 1 0 6 2 5 8 7
+1 1 0 2 0 20 21 19 1 1 0 2 0 20 21 19
+```
+
+
+Interrupt rate collected per TX and RX queue in logs tx_rx_int_rx
+Note this log collect from TX pod and RX pod.
+
+tx_rx_int_rx_1000pps_1cores_3pairs_64pkt_20240406043811.log 
+tx_rx_int_tx_1000pps_1cores_3pairs_64pkt_20240406043811.log
+
+Example each chunk 8 is for 8 queues, index position is CPU.
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 197 0 0 0 1309369 0 0
+0 0 0 0 0 51114 0 0 0 0 0 0 0 0 0 0 0 0 578 0 0 0 0 0
+0 0 0 0 0 0 0 0 0 39281 0 0 0 0 0 0 0 0 0 201 0 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 186174 0 210 0 0 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 2553460 0 0 0 0 0 0 680 0 0
+0 0 0 0 0 0 0 58694 0 0 0 0 0 0 0 0 0 0 0 0 0 0 238 0
+0 0 0 74120 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 229
+0 0 0 0 157 0 0 0 0 0 0 0 0 0 0 0 207300 0 0 0 0 0 0 0
+
 in case we want monitor or collect run ./run_monitor_ssh script. 
 
 This script will run trafgen between two target POD. ( by default it use server0 and serve1)

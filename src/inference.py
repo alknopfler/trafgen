@@ -13,10 +13,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import subprocess
+import json
 
 
-def dataset_files(directory):
+def dataset_files(
+        directory
+):
     """ List all files in the specified directory and parse their names.
+
+    file name format expected
+
+    rx_pps_1000_pairs_3_size_64_cores_1_pods-cores_2_4_6.log
 
     Data it returns.
     Path to file generate at node that generate i.e. observation
@@ -52,35 +59,159 @@ def dataset_files(directory):
     file_details = {}
 
     for file in files:
-        if file.startswith(('tx_', 'rx_')) and file.endswith('.txt'):
-            parts = file.split('_')
+        if file.startswith(('tx_', 'rx_')) and file.endswith('.log'):
+            file_name = file[:-4]
+            parts = file_name.split('_')
+            # ['rx', 'pps', '400000', 'pairs', '3', 'size', '64', 'cores', '1', 'pods-cores', '2', '4', '6']
             if len(parts) >= 7:
-                pps = int(parts[1].replace('pps', ''))
-                run_time = int(parts[2])
-                core_parts = parts[4].split('-') if '-' in parts[4] else [parts[4]]
-                cores = [int(core.replace('core', '')) for core in core_parts]
+                pps = int(parts[2].replace('pps', ''))
+                pairs = int(parts[4])
+                frame_size = int(parts[6])
+                core_per_pod = int(parts[8])
+                cores = [int(core) for core in parts[10:]]
 
-                size = int(parts[6])
-                key = f"{pps}pps_{run_time}_core_{'-'.join(str(c) for c in cores)}_size_{size}"
-
+                key = f"pps_{pps}_pair_{pairs}_cores_{'-'.join(str(c) for c in cores)}_size_{frame_size}"
                 if key not in file_details:
                     file_details[key] = {
                         'rx': None,
                         'tx': None,
-                        'run_time': run_time,
                         'pps': pps,
+                        'pairs': pairs,
+                        'core_per_pod': core_per_pod,
                         'cores': cores,
-                        'size': size
+                        'size': frame_size,
+                        'metadata': {
+                            'rx_pps': {'description': 'Received PPS', 'position': 0},
+                            'tx_pps': {'description': 'Transmitted PPS', 'position': 1},
+                            'rx_drop': {'description': 'Received Drops', 'position': 2},
+                            'tx_drop': {'description': 'Transmitted Drops', 'position': 3},
+                            'rx_err': {'description': 'Received Errors', 'position': 4},
+                            'tx_err': {'description': 'Transmitted Errors', 'position': 5},
+                            'rx_bytes': {'description': 'Received Bytes', 'position': 6},
+                            'tx_bytes': {'description': 'Transmitted Bytes', 'position': 7},
+                            'irq_rate': {'description': 'IRQ Rate', 'position': 8},
+                            's_irq_rate': {'description': 'Soft IRQ Rate', 'position': 9},
+                            'net_tx_rate': {'description': 'Network Transmit Rate', 'position': 10},
+                            'net_rx_rate': {'description': 'Network Receive Rate', 'position': 11},
+                            'cpu_core': {'description': 'CPU Core', 'position': 12},
+                            'cpu_usage': {'description': 'CPU Usage', 'position': 13}
+                        }
                     }
 
                 if file.startswith('tx_'):
                     data_file = os.path.join(directory, file)
                     file_details[key]['tx'] = data_file
                     file_details[key]['tx_data'] = np.loadtxt(data_file, delimiter=',')
+
                 else:
                     data_file = os.path.join(directory, file)
                     file_details[key]['rx'] = data_file
-                    file_details[key]['rx_data'] = np.loadtxt(data_file, delimiter=',')
+                    np_data = np.loadtxt(data_file, delimiter=',')
+                    file_details[key]['rx_data'] = np_data
+
+    return file_details
+
+
+def dataset_files_from_dict(
+        combine_files: dict,
+        base_dir: str,
+        is_verbose: bool = False
+):
+    """
+    Load data from files listed in combine_files dictionary into numpy arrays.
+
+    :param base_dir:
+    :param is_verbose:
+    :param combine_files: Dictionary containing file information.
+    :return: Updated dictionary with loaded numpy arrays.
+    """
+    file_details = {}
+
+    for data_key, value in combine_files.items():
+
+        pod_files = value.get('files', [])
+        worker_metrics = value.get('worker_metrics', {})
+        core_list = [int(core) for core in value.get('core_list', [])]
+
+        if not pod_files:
+            continue
+
+        pps, pairs, frame_size, cores_per_pod = data_key
+        key = (f"pps_{pps}_pair_{pairs}_"
+               f"cores_per_pod_{cores_per_pod}_"
+               f"cores_{'-'.join(str(c) for c in core_list)}_size_{frame_size}")
+
+        if key not in file_details:
+            file_details[key] = {
+                'rx_files': [],
+                'tx_files': [],
+                'pps': pps,
+                'pairs': pairs,
+                'core_per_pod': cores_per_pod,
+                'cores': core_list,
+                'size': frame_size,
+                'metadata': {
+                    'rx_pps': {'description': 'Received PPS', 'position': 0},
+                    'tx_pps': {'description': 'Transmitted PPS', 'position': 1},
+                    'rx_drop': {'description': 'Received Drops', 'position': 2},
+                    'tx_drop': {'description': 'Transmitted Drops', 'position': 3},
+                    'rx_err': {'description': 'Received Errors', 'position': 4},
+                    'tx_err': {'description': 'Transmitted Errors', 'position': 5},
+                    'rx_bytes': {'description': 'Received Bytes', 'position': 6},
+                    'tx_bytes': {'description': 'Transmitted Bytes', 'position': 7},
+                    'irq_rate': {'description': 'IRQ Rate', 'position': 8},
+                    's_irq_rate': {'description': 'Soft IRQ Rate', 'position': 9},
+                    'net_tx_rate': {'description': 'Network Transmit Rate', 'position': 10},
+                    'net_rx_rate': {'description': 'Network Receive Rate', 'position': 11},
+                    'cpu_core': {'description': 'CPU Core', 'position': 12},
+                    'cpu_usage': {'description': 'CPU Usage', 'position': 13}
+                }
+            }
+
+        # load all metric collected form pods.
+        # all TX loaded as one matrix same for RX
+        for pod_file_name in pod_files:
+            if 'server' in pod_file_name:
+                if is_verbose:
+                    print("Loading server file: ", pod_file_name)
+                if 'tx_data' not in file_details[key]:
+                    file_details[key]['tx_data'] = np.loadtxt(pod_file_name, delimiter=',')
+                else:
+                    file_details[key]['tx_data'] = np.append(
+                        file_details[key]['tx_data'],
+                        np.loadtxt(pod_file_name, delimiter=','), axis=0)
+                file_details[key]['tx_files'].append(pod_file_name)
+            else:
+                if is_verbose:
+                    print("Loading client file: ", pod_file_name)
+                if 'rx_data' not in file_details[key]:
+                    file_details[key]['rx_data'] = np.loadtxt(pod_file_name, delimiter=',')
+                else:
+                    file_details[key]['rx_data'] = np.append(
+                        file_details[key]['rx_data'],
+                        np.loadtxt(pod_file_name, delimiter=','), axis=0)
+                    file_details[key]['rx_files'].append(pod_file_name)
+
+        # load metric collected from each worker node
+        for metric_type, files in worker_metrics.items():
+            for metric_file in files:
+                metric_full_path = os.path.join(base_dir, metric_file)
+                if is_verbose:
+                    print(f"Loading metric type: {metric_type} file: {metric_full_path}")
+                try:
+                    if metric_type not in file_details[key]:
+                        file_details[key][metric_type] = np.loadtxt(metric_full_path)
+                        if is_verbose:
+                            print("Loaded shape", file_details[key][metric_type].shape)
+                except ValueError as e:
+                    print(f"Failed to load file: {metric_full_path}")
+                    print(f"Error occurred in file '{metric_full_path}' at line {e.__traceback__.tb_lineno}: {e}")
+
+        file_details[key]['tx_pod_cores'] = file_details[key]['tx_pod_int'].shape[1]
+        file_details[key]['rx_pod_cores'] = file_details[key]['rx_pod_int'].shape[1]
+
+        file_details[key]['tx_pod_n_queues'] = file_details[key]['tx_queues'].shape[1]
+        file_details[key]['rx_pod_n_queues'] = file_details[key]['rx_queues'].shape[1]
 
     return file_details
 
@@ -175,7 +306,9 @@ def plot_tx_bound(
         tolerance=0.02,
         output=None
 ):
-    """Plot PPS against observed TX vs target PPS.
+    """Plot observed TX PPS against target PPS.  Here we cross correlate tx and target.
+    i.e. identify for given core set what we reached.
+
     :param output:
     :param dataset: Dictionary containing file details.
     :param size: Packet size for which experiments are conducted.
@@ -189,26 +322,23 @@ def plot_tx_bound(
     target_pps_list = []
     observed_pps_list = []
 
-    for core in cores:
-        for key, details in dataset.items():
-            if details['size'] == size and core in details['cores']:
-                target_pps = details['pps']
-                tx_data = details['tx_data']
-                rx_data = details['rx_data']
-
-                tx_data = details['tx_data']
-                observed_pps = np.mean(tx_data[:, 1])
-
-                target_pps_list.append(target_pps)
-                observed_pps_list.append(observed_pps)
+    for key, details in dataset.items():
+        if details['size'] == size and tuple(details['cores']) == tuple(cores):
+            target_pps = details['pps']
+            tx_data = details['tx_data']
+            observed_pps = np.mean(tx_data[:, 1])
+            target_pps_list.append(target_pps)
+            observed_pps_list.append(observed_pps)
 
     sorted_indices = np.argsort(target_pps_list)
-    sorted_target_pps = np.array(target_pps_list)[sorted_indices]
-    sorted_observed_pps = np.array(observed_pps_list)[sorted_indices]
+    sorted_target_pps = np.array(target_pps_list, dtype=float)[sorted_indices]
+    sorted_observed_pps = np.array(observed_pps_list, dtype=float)[sorted_indices]
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    ax.bar(sorted_target_pps.astype(str), sorted_observed_pps, label='Observed PPS', color='lightgray')
+    ax.bar(sorted_target_pps.astype(str),
+           sorted_observed_pps, label='Observed PPS', color='lightgray')
+
     ax.bar(sorted_target_pps.astype(str), sorted_target_pps - sorted_observed_pps,
            bottom=sorted_observed_pps, label='Target PPS', color='skyblue')
 
@@ -236,8 +366,8 @@ def plot_rx_bound(
         output=None
 ):
     """ Plot a bar graph showing the target PPS, observed TX PPS, and observed RX PPS.
-    Here we cross corelate tx / rx and target.  Assume TX x and RX x while target y.
-    i.e.TX bounded by busy wait / CPU etc.
+    Here we cross correlate TX / RX and target. Assume TX x and RX x while target y.
+    i.e. TX bounded by busy wait / CPU etc.
 
     :param dataset:
     :param size:
@@ -251,19 +381,18 @@ def plot_rx_bound(
     observed_tx_pps_list = []
     observed_rx_pps_list = []
 
-    for core in cores:
-        for key, details in dataset.items():
-            if details['size'] == size and core in details['cores']:
-                target_pps = details['pps']
-                tx_data = details['tx_data']
-                rx_data = details['rx_data']
+    for key, details in dataset.items():
+        if details['size'] == size and tuple(details['cores']) == tuple(cores):
+            target_pps = details['pps']
+            tx_data = details['tx_data']
+            rx_data = details['rx_data']
 
-                observed_tx_pps = np.mean(tx_data[:, 1])
-                observed_rx_pps = np.mean(rx_data[:, 0])
+            observed_tx_pps = np.mean(tx_data[:, 1])
+            observed_rx_pps = np.mean(rx_data[:, 0])
 
-                target_pps_list.append(target_pps)
-                observed_tx_pps_list.append(observed_tx_pps)
-                observed_rx_pps_list.append(observed_rx_pps)
+            target_pps_list.append(float(target_pps))
+            observed_tx_pps_list.append(observed_tx_pps)
+            observed_rx_pps_list.append(observed_rx_pps)
 
     # Sorting by target PPS
     sorted_indices = np.argsort(target_pps_list)
@@ -273,18 +402,19 @@ def plot_rx_bound(
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    bar_width = 0.3
+    bar_width = 0.2
     index = np.arange(len(sorted_target_pps))
 
-    ax.bar(sorted_target_pps.astype(str), sorted_observed_tx_pps, label='Observed TX PPS', color='lightgray')
-    ax.bar(sorted_target_pps.astype(str), sorted_observed_rx_pps, label='Observed RX PPS', color='green', alpha=0.5)
-    ax.plot(sorted_target_pps.astype(str), sorted_target_pps, label='Target PPS', color='skyblue', linestyle='--')
+    ax.bar(index - bar_width, sorted_observed_tx_pps, width=bar_width, label='Observed TX PPS', color='lightgray')
+    ax.bar(index, sorted_observed_rx_pps, width=bar_width, label='Observed RX PPS', color='green', alpha=0.5)
+    ax.scatter(index, sorted_target_pps, label='Target PPS', color='orange', marker='o', s=50)
+    ax.plot(index, sorted_target_pps, color='orange', linestyle='-', alpha=1.0)
 
     ax.set_xlabel('Target PPS (Packets per Second)')
     ax.set_ylabel('PPS (Packets per Second)')
     ax.set_title(f'Observed TX vs. RX PPS for Cores {cores}, Packet Size {size}')
-    ax.set_xticks(sorted_target_pps.astype(str))
-    ax.set_xticklabels(sorted_target_pps.astype(str), rotation=45)
+    ax.set_xticks(index)
+    ax.set_xticklabels(sorted_target_pps.astype(int), rotation=45)
     ax.legend()
     ax.grid(True)
 
@@ -297,36 +427,182 @@ def plot_rx_bound(
         plt.show()
 
 
+def plot_tx_rx_interrupts(
+        dataset: dict,
+        size,
+        cores,
+        tolerance=0.02,
+        output=None,
+        pps=None,
+        side='tx',
+):
+    """ Plot interrupts rate per queues.
+    It take a stride size number of queues and aggregate for each core.
+
+    :param dataset: Dictionary containing experiment data.
+    :param size: Size parameter for the plot.
+    :param cores: Cores used for the experiment.
+    :param tolerance: Tolerance value for the plot.
+    :param output: Optional. Filepath to save the plot. If not provided, the plot will be displayed.
+    :param pps: Optional. PPS value for the plot.
+    :param side: Optional. Side parameter for the plot (default is 'tx').
+
+    :return: None
+    """
+
+    for key, details in dataset.items():
+        if (
+                details['size'] == size
+                and tuple(details['cores']) == tuple(cores)
+                and int(details['pps']) == int(pps)
+        ):
+            m = details[f'{side}_pod_int']
+            n_queue = 9
+            n_cpu = m.shape[1]
+            n_samples = m.shape[0]
+
+            n_chunks = len(m) // n_queue
+            reshaped_m = m.reshape(n_chunks, n_cpu, -1)
+            reshaped_m = np.swapaxes(reshaped_m, 0, 1)
+            # num of cpu, num_queue
+            strided_sum = np.sum(reshaped_m, axis=1)
+            strided_sum = strided_sum.reshape(n_queue, n_cpu)
+
+            # filter cpu with zero interrupts
+            non_zero_cpu_ids = np.where(np.sum(strided_sum, axis=0) > 0)[0]
+            filtered_strided_sum = strided_sum[:, non_zero_cpu_ids]
+
+            fig = plt.figure(figsize=(18, 6))
+            ax = fig.add_subplot(111)
+
+            width = 0.25
+            for i, queue_id in enumerate(range(n_queue)):
+                x = np.arange(len(non_zero_cpu_ids))
+                ax.bar(x + i * width, filtered_strided_sum[queue_id],
+                       width=width, label=f'Queue {queue_id}', alpha=0.7)
+
+            ax.set_xlabel('CPU ID')
+            ax.set_ylabel('Number of Interrupts per queue')
+            ax.set_title(f'({side.upper()} Side) Interrupts per Queue and CPU, pps {pps}')
+            ax.set_xticks(x + (n_queue - 1) * width / 2)
+            ax.set_xticklabels([f'{non_zero_cpu_ids[cpu_idx]}' for cpu_idx in range(len(non_zero_cpu_ids))])
+
+            details_text = f"PPS: {details['pps']} pps\n" \
+                           f"Side: {side.upper()} ({'Transmit' if side == 'tx' else 'Receive'})\n" \
+                           f"Cores Used: {cores}\nSize: {size}\nTolerance: {tolerance}\n" \
+                           f"Byte Size: {details['size']}"
+
+            plt.text(1.01, 0.5, details_text, fontsize=10,
+                     transform=ax.transAxes, verticalalignment='center')
+
+            ax.legend()
+
+    plt.tight_layout()
+
+    if output:
+        plt.savefig(output)
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
+
+
+def plot_queue_rate(
+        dataset: dict,
+        size,
+        cores,
+        output=None,
+        pps=None,
+        side='tx',
+):
+    """ Plot pps rate observed on each queue.
+
+    :param dataset: Dictionary containing experiment data.
+    :param size: Size parameter for the plot.
+    :param cores: Cores used for the experiment.
+    :param output: Optional. Filepath to save the plot. If not provided, the plot will be displayed.
+    :param pps: Optional. PPS value for the plot.
+    :param side: Optional. Side parameter for the plot (default is 'tx').
+
+    :return: None
+    """
+
+    for key, details in dataset.items():
+        if (
+                details['size'] == size
+                and tuple(details['cores']) == tuple(cores)
+                and int(details['pps']) == int(pps)
+        ):
+            queues_data = details[f'{side}_queues']
+            n_queues = queues_data.shape[1]
+
+            queue_means = np.mean(queues_data, axis=0)
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            index = np.arange(n_queues)
+            bar_width = 0.35
+
+            tx_color = 'skyblue'
+            rx_color = 'orange'
+
+            # Bar plot for TX queues
+            ax.bar(index[:8], queue_means[:8], bar_width, label=f'TX Queues PPS', color=tx_color)
+
+            # Bar plot for RX queues
+            ax.bar(index[8:], queue_means[8:], bar_width, label=f'RX Queues PPS', color=rx_color)
+            #
+            # ax.bar(index, queue_means, bar_width, label=f'{side.upper()} Queues PPS', color='skyblue')
+
+            ax.set_xlabel('Queue ID')
+            ax.set_ylabel('Total PPS')
+            ax.set_title(f'Mean PPS for POD-{side.upper()} Queue, Size {size}, Cores {cores} , pps {pps}')
+            ax.set_xticks(index)
+            ax.set_xticklabels([f'{i}' for i in range(n_queues)])
+            ax.legend()
+            ax.grid(True, which="both", ls="-")
+
+            plt.tight_layout()
+
+            if output:
+                plt.savefig(output)
+                print(f"Plot saved to {output}")
+            else:
+                plt.show()
+
+
 def plot_irq_sw_irq_rate(
         dataset: dict,
         size: int,
-        cores: list[int],
+        cores: int,
         output=None,
 ):
-    """
-    :param dataset:  a dataset
-    :param size:
-    :param cores:
+    """Plots the IRQ and SIRQ rates for a given packet size and number of cores used.
+
+    :param dataset: a dataset
+    :param size: frame size
+    :param cores: a list of cores that we plot [2, 4, 6] for example single core per pod.
+    :param output: output file
     :return:
     """
-    plt.figure(figsize=(10, 6))
 
+    plt.figure(figsize=(10, 6))
     target_pps_list = []
     irq_rates_list = []
     sirq_rates_list = []
 
-    for core in cores:
-        for key, details in dataset.items():
-            if details['size'] == size and core in details['cores']:
-                target_pps = details['pps']
-                tx_data = details['tx_data']
+    for key, details in dataset.items():
+        if details['size'] == size and cores == details['cores']:
+            target_pps = details['pps']
+            tx_data = details['tx_data']
 
-                irq_rate = np.mean(tx_data[:, 8])
-                sirq_rate = np.mean(tx_data[:, 9])
+            irq_idx = details['metadata']['irq_rate']['position']
+            sirq_idx = details['metadata']['s_irq_rate']['position']
 
-                target_pps_list.append(target_pps)
-                irq_rates_list.append(irq_rate)
-                sirq_rates_list.append(sirq_rate)
+            irq_rate = np.mean(tx_data[:, irq_idx])
+            sirq_rate = np.mean(tx_data[:, sirq_idx])
+
+            target_pps_list.append(target_pps)
+            irq_rates_list.append(irq_rate)
+            sirq_rates_list.append(sirq_rate)
 
     sorted_indices = np.argsort(target_pps_list)
     sorted_target_pps = np.array(target_pps_list)[sorted_indices]
@@ -338,7 +614,7 @@ def plot_irq_sw_irq_rate(
     bar_width = 0.35
 
     ax.bar(index - bar_width / 2, sorted_irq_rates, bar_width, label='IRQ Rate', color='skyblue')
-    ax.bar(index + bar_width / 2, sorted_sirq_rates, bar_width, label='SIRQ Rate', color='lightgreen')
+    ax.bar(index + bar_width / 2, sorted_sirq_rates, bar_width, label='SIRQ Rate', color='orange')
 
     ax.set_xlabel('Target PPS (Packets per Second)')
     ax.set_ylabel('Rates')
@@ -360,7 +636,8 @@ def plot_stats(
         metric_dataset: dict,
         plot_type: str,
         plotter: callable,
-        output_dir=None
+        output_dir=None,
+        **kwargs
 ):
     """plot stats take metric dataset,
     callback that will plot and output dir (optional)
@@ -386,7 +663,13 @@ def plot_stats(
             )
         else:
             output_file = None
-        plotter(metric_dataset, experiment[0], list(experiment[1]), output=output_file)
+
+        if kwargs:
+            plotter(metric_dataset, experiment[0],
+                    list(experiment[1]), output=output_file, **kwargs)
+        else:
+            plotter(metric_dataset, experiment[0],
+                    list(experiment[1]), output=output_file)
 
 
 def run_sampling(
@@ -410,27 +693,252 @@ def run_sampling(
     print("Sampling completed.")
 
 
+# def combine_server_files(files, output_file):
+#     with open(output_file, 'w') as outfile:
+#         for file in files:
+#             with open(file) as infile:
+#                 outfile.write(infile.read())
+
+def find_files(key, files_dict):
+    """
+    Find files corresponding to the given key in the files dictionary.
+
+    :param key: A tuple representing (pps, pairs, size, cores).
+    :param files_dict: A dictionary containing lists of files for different types (tx_pod_int, rx_pod_int, tx_queues, rx_queues).
+    :return: A dictionary containing file lists for each type corresponding to the key.
+    """
+    pps, pairs, size, cores = key
+    result_files = {}
+
+    for file_type, files_list in files_dict.items():
+        found_files = [file for file in files_list if f"pr_{pps}_" in file and f"pairs_{pairs}_" in file
+                       and f"size_{size}_" in file and f"cores_{cores}_" in file]
+        result_files[file_type] = found_files
+
+    return result_files
+
+
+def combine_file_names(directory):
+    """
+    Combines file names under same experiment.
+    based on PPS rate, number of pairs, and size.
+
+    This method create single dict consisting of all files related to experiment.
+
+    Example:
+    {
+        "200000 3 64 1": {
+            "core_list": [
+                "2",
+                "4",
+                "6"
+            ],
+            "files": [
+                "/Users/spyroot/dev/trafgen/src/metrics/server_server2-ve-56377f29-e603-11ee-a122-179ee4765847_pr_200000_runtime_120_cores_1_pairs_3_size_64_core_list_6_ts_20240406063337.log",
+                "/Users/spyroot/dev/trafgen/src/metrics/server_server1-ve-56377f29-e603-11ee-a122-179ee4765847_pr_200000_runtime_120_cores_1_pairs_3_size_64_core_list_4_ts_20240406063337.log",
+                "/Users/spyroot/dev/trafgen/src/metrics/client_client0-ve-56377f29-e603-11ee-a122-179ee4765847_pr_200000_runtime_120_cores_1_pairs_3_size_64_core_list_2_ts_20240406063337.log",
+                "/Users/spyroot/dev/trafgen/src/metrics/client_client1-ve-56377f29-e603-11ee-a122-179ee4765847_pr_200000_runtime_120_cores_1_pairs_3_size_64_core_list_4_ts_20240406063337.log",
+                "/Users/spyroot/dev/trafgen/src/metrics/server_server0-ve-56377f29-e603-11ee-a122-179ee4765847_pr_200000_runtime_120_cores_1_pairs_3_size_64_core_list_2_ts_20240406063337.log",
+                "/Users/spyroot/dev/trafgen/src/metrics/client_client2-ve-56377f29-e603-11ee-a122-179ee4765847_pr_200000_runtime_120_cores_1_pairs_3_size_64_core_list_6_ts_20240406063337.log"
+            ],
+            "worker_metrics": {
+                "tx_pod_int": [
+                    "tx-pod-int_pr_200000_runtime_120_cores_1_pairs_3_size_64_20240406063334.log"
+                ],
+                "rx_pod_int": [
+                    "rx-pod-int_pr_200000_runtime_120_cores_1_pairs_3_size_64_20240406063334.log"
+                ],
+                "tx_queues": [
+                    "tx-pod-queue_pr_200000_runtime_120_cores_1_pairs_3_size_64_ts_20240406063334.log"
+                ],
+                "rx_queues": [
+                    "rx-pod-queue_pr_200000_runtime_120_cores_1_pairs_3_size_64_ts_20240406063334.log"
+                ]
+            }
+        }
+    }
+
+    :param directory: The directory where the files are located.
+    :return: A dictionary where keys are (PPS rate, number of pairs, size) tuples
+    and values are lists of paths to combined files.
+    """
+    pod_files = [file for file in os.listdir(directory)
+                 if (file.startswith('server_server') or
+                     file.startswith('client_client')) and file.endswith('.log')]
+
+    tx_pod_int_files = [file for file in os.listdir(directory)
+                        if (file.startswith('tx-pod-int')) and file.endswith('.log')]
+    rx_pod_int_files = [file for file in os.listdir(directory)
+                        if (file.startswith('rx-pod-int')) and file.endswith('.log')]
+
+    tx_queues_files = [file for file in os.listdir(directory)
+                       if (file.startswith('tx-pod-queue')) and file.endswith('.log')]
+    rx_queues_files = [file for file in os.listdir(directory)
+                       if (file.startswith('rx-pod-queue')) and file.endswith('.log')]
+
+    tx_cpu_files = [file for file in os.listdir(directory)
+                    if file.startswith('tx-pod-cpu') and file.endswith('.log')]
+    rx_cpu_files = [file for file in os.listdir(directory)
+                    if file.startswith('rx-pod-cpu') and file.endswith('.log')]
+
+    # all stats per experiment collected from worker node
+    files_dict = {
+        'tx_pod_int': tx_pod_int_files,
+        'rx_pod_int': rx_pod_int_files,
+        'tx_queues': tx_queues_files,
+        'rx_queues': rx_queues_files,
+        'tx_cpu': tx_cpu_files,
+        'rx_cpu': rx_cpu_files
+    }
+
+    combined_files = {}
+    for file in pod_files:
+        file_parts = file.split('_')
+        pps = file_parts[3].replace('pps', '')
+        cores = file_parts[7]
+        pairs = file_parts[9]
+        size = file_parts[11]
+        core_list = file_parts[14]
+        key = (pps, pairs, size, cores)
+
+        worker_metric_files = find_files(key, files_dict)
+
+        if key not in combined_files:
+            combined_files[key] = {'core_list': set(), 'files': [], 'worker_metrics': {}}
+
+        combined_files[key]['core_list'].add(core_list)
+        combined_files[key]['files'].append(os.path.join(directory, file))
+        combined_files[key]['worker_metrics'].update(worker_metric_files)
+
+    for key, value in combined_files.items():
+        value['core_list'] = sorted(set(value['core_list']))
+
+    return combined_files
+
+
+def merge_file(
+        files_list: list[str],
+        output_file_name: str,
+        output_directory: str
+):
+    """
+    Merge a list of files into a single output file.
+
+    :param files_list: List of paths to files to be merged.
+    :param output_file_name: Name of the output merged file.
+    :param output_directory: The directory where the merged file will be saved.
+    """
+    output_file_path = os.path.join(output_directory, output_file_name)
+    with open(output_file_path, 'w') as outfile:
+        for file in files_list:
+            with open(file, 'r') as infile:
+                outfile.write(infile.read())
+
+
+def merge_files(
+        combined_files: dict,
+        metric_dir: str
+):
+    """
+    Merge all experiments files under the same experiment
+    for server and client pods.
+
+    :param combined_files: A dictionary where keys are (PPS rate, number of pairs, size, cores, core list)
+    tuples and values are lists of paths to combined files.
+    :param metric_dir: The directory where the merged files will be saved.
+    """
+    for key, file_data in combined_files.items():
+        pps, pairs, size, cores = key
+        files_list = file_data['files']
+        cores_list = file_data['core_list']
+        cores_list_str = "_".join(map(str, cores_list))
+        server_files = [file for file in files_list if 'server_server' in file]
+        client_files = [file for file in files_list if 'client_client' in file]
+
+        if server_files:
+            merge_file(server_files, f"tx_pps_{pps}_pairs_{pairs}_size_"
+                                     f"{size}_cores_{cores}_pods-cores_{cores_list_str}.log", metric_dir)
+
+        if client_files:
+            merge_file(client_files, f"rx_pps_{pps}_pairs_{pairs}_size_"
+                                     f"{size}_cores_{cores}_pods-cores_{cores_list_str}.log", metric_dir)
+
+
+def sample_entry(metric_dataset):
+    """
+    Sample one entry and print what we loaded
+    :param metric_dataset:
+    :return:
+    """
+    first_record = next(iter(metric_dataset.values()))
+    print("Dimension of first record's tx_data:",
+          first_record['tx_data'].shape if first_record['tx_data'] is not None else None)
+    print("Dimension of first record's rx_data:",
+          first_record['rx_data'].shape if first_record['rx_data'] is not None else None)
+    print(first_record)
+
+
 def main(cmd):
     """Run main , note sampling is optional arg, by default,
     we read metric dir and plot all samples collected.
     :return:
     """
-    if cmd.sample:
-        run_sampling(cmd.pps_values, cmd.cores)
+    # if cmd.sample:
+    #     run_sampling(cmd.pps_values, cmd.cores)
 
     if cmd.output_dir:
         os.makedirs(cmd.output_dir, exist_ok=True)
 
     directory = os.path.join(os.getcwd(), cmd.metric_dir)
-    metric_dataset = dataset_files(directory)
+    combine_files = combine_file_names(directory)
 
-    if cmd.print_metric:
-        print_metric(metric_dataset)
+    if cmd.debug:
+        sample_key, sample_value = next(iter(combine_files.items()))
+        print(json.dumps(sample_value, indent=4))
 
-    plot_stats(metric_dataset, "tx_bounded", plot_tx_bound, output_dir=cmd.output_dir)
-    plot_stats(metric_dataset, "rx_bounded", plot_rx_bound, output_dir=cmd.output_dir)
-    plot_stats(metric_dataset, "drop_bounded", plot_drop_rate, output_dir=cmd.output_dir)
-    plot_stats(metric_dataset, "sw_irq_bounded", plot_irq_sw_irq_rate, output_dir=cmd.output_dir)
+    metric_dataset = dataset_files_from_dict(combine_files, directory)
+    if cmd.debug:
+        sample_entry(metric_dataset)
+
+    # experiments_dir = os.path.join(directory, "experiments")
+    # if not os.path.exists(experiments_dir):
+    #     os.makedirs(experiments_dir)
+
+    # merge_files(combine_files, experiments_dir)
+    # metric_dataset = dataset_files(experiments_dir)
+
+    # if cmd.print_metric:
+    #     print_metric(metric_dataset)
+    #
+
+    # plot_stats(metric_dataset, "tx_bounded", plot_tx_bound, output_dir=cmd.output_dir)
+    # plot_stats(metric_dataset, "rx_bounded", plot_rx_bound, output_dir=cmd.output_dir)
+    # plot_stats(metric_dataset, "drop_bounded", plot_drop_rate, output_dir=cmd.output_dir)
+    # plot_stats(metric_dataset, "sw_irq_bounded", plot_irq_sw_irq_rate, output_dir=cmd.output_dir)
+
+    all_pps_values = [details['pps'] for details in metric_dataset.values()]
+    for pps in all_pps_values:
+        plot_stats(metric_dataset, "plot_tx_rx_interrupts", plot_tx_rx_interrupts,
+                   output_dir=cmd.output_dir,
+                   pps=pps,
+                   side='rx')
+
+        plot_stats(metric_dataset, "plot_tx_rx_interrupts", plot_tx_rx_interrupts,
+                   output_dir=cmd.output_dir,
+                   pps=pps,
+                   side='tx')
+
+    # all_pps_values = [details['pps'] for details in metric_dataset.values()]
+    for pps in all_pps_values:
+        plot_stats(metric_dataset, "plot_queue_rate", plot_queue_rate,
+                   output_dir=cmd.output_dir,
+                   pps=pps,
+                   side='rx')
+
+        plot_stats(metric_dataset, "plot_queue_rate", plot_queue_rate,
+                   output_dir=cmd.output_dir,
+                   pps=pps,
+                   side='tx')
 
 
 if __name__ == "__main__":
@@ -445,5 +953,6 @@ if __name__ == "__main__":
                         type=int, default=[1, 2, 3, 4],
                         help='List of num cores for sampling')
     parser.add_argument('-o', '--output_dir', type=str, help='Output directory for plots')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
     main(args)
