@@ -1,11 +1,12 @@
 """
-# Take all data generate from monitor.pps load to numpy and plot.
-# software irq rate vs target ps vs observed pps
-# tx pps vs rx pps,  drop vs pps etc.
+# Take all data generate from monitor.pps and other script.
+# Load to numpy and plot inference points.
+# All logs read from metrics dir by default.
 #
 # pip install numpy
 # pip install matplotlib
-# Mus
+#
+# Mus mbayramov@vwamrec.om
 """
 
 import os
@@ -405,8 +406,16 @@ def plot_rx_bound(
     bar_width = 0.2
     index = np.arange(len(sorted_target_pps))
 
-    ax.bar(index - bar_width, sorted_observed_tx_pps, width=bar_width, label='Observed TX PPS', color='lightgray')
-    ax.bar(index, sorted_observed_rx_pps, width=bar_width, label='Observed RX PPS', color='green', alpha=0.5)
+    ax.bar(index - bar_width,
+           sorted_observed_tx_pps,
+           width=bar_width,
+           label='Observed TX PPS',
+           color='lightgray')
+    ax.bar(index, sorted_observed_rx_pps,
+           width=bar_width,
+           label='Observed RX PPS',
+           color='green',
+           alpha=0.5)
     ax.scatter(index, sorted_target_pps, label='Target PPS', color='orange', marker='o', s=50)
     ax.plot(index, sorted_target_pps, color='orange', linestyle='-', alpha=1.0)
 
@@ -437,7 +446,9 @@ def plot_tx_rx_interrupts(
         side='tx',
 ):
     """ Plot interrupts rate per queues.
-    It take a stride size number of queues and aggregate for each core.
+    It takes a stride size = number of queues and aggregate and normalize rate
+    for each core.  The output of aggregate is matrix of size (q, c)
+    where q is number of queues and c is number of cores.
 
     :param dataset: Dictionary containing experiment data.
     :param size: Size parameter for the plot.
@@ -456,6 +467,9 @@ def plot_tx_rx_interrupts(
                 and tuple(details['cores']) == tuple(cores)
                 and int(details['pps']) == int(pps)
         ):
+            # data collected txrx is 9 entries.
+            # stride across 9 to compute aggregate.
+            # note interrupts in logs is rate sample each second
             m = details[f'{side}_pod_int']
             n_queue = 9
             n_cpu = m.shape[1]
@@ -481,7 +495,7 @@ def plot_tx_rx_interrupts(
                 ax.bar(x + i * width, filtered_strided_sum[queue_id],
                        width=width, label=f'Queue {queue_id}', alpha=0.7)
 
-            ax.set_xlabel('CPU ID')
+            ax.set_xlabel('core id')
             ax.set_ylabel('Number of Interrupts per queue')
             ax.set_title(f'({side.upper()} Side) Interrupts per Queue and CPU, pps {pps}')
             ax.set_xticks(x + (n_queue - 1) * width / 2)
@@ -496,6 +510,7 @@ def plot_tx_rx_interrupts(
                      transform=ax.transAxes, verticalalignment='center')
 
             ax.legend()
+            ax.grid(True)
 
     plt.tight_layout()
 
@@ -513,9 +528,13 @@ def plot_queue_rate(
         output=None,
         pps=None,
         side='tx',
+        n_qs=8,
 ):
-    """ Plot pps rate observed on each queue.
+    """ Plot pps rate observed on each TX and RX queue.
 
+    Note each sample collected on TX pod and RX, thus on TX POD RX queue almost 0.
+
+    :param n_qs:
     :param dataset: Dictionary containing experiment data.
     :param size: Size parameter for the plot.
     :param cores: Cores used for the experiment.
@@ -533,9 +552,11 @@ def plot_queue_rate(
                 and int(details['pps']) == int(pps)
         ):
             queues_data = details[f'{side}_queues']
-            n_queues = queues_data.shape[1]
 
+            n_queues = n_qs * 2
             queue_means = np.mean(queues_data, axis=0)
+            queue_means = queue_means[:n_qs * 2]
+
             fig, ax = plt.subplots(figsize=(12, 8))
 
             index = np.arange(n_queues)
@@ -544,21 +565,165 @@ def plot_queue_rate(
             tx_color = 'skyblue'
             rx_color = 'orange'
 
-            # Bar plot for TX queues
-            ax.bar(index[:8], queue_means[:8], bar_width, label=f'TX Queues PPS', color=tx_color)
+            tx_queue_means = queue_means[:n_qs]
+            rx_queue_means = queue_means[n_qs:]
 
-            # Bar plot for RX queues
-            ax.bar(index[8:], queue_means[8:], bar_width, label=f'RX Queues PPS', color=rx_color)
-            #
-            # ax.bar(index, queue_means, bar_width, label=f'{side.upper()} Queues PPS', color='skyblue')
+            ax.bar(index[:n_qs], tx_queue_means, bar_width, label=f'TX Queues PPS', color=tx_color)
+            ax.bar(index[n_qs:], rx_queue_means, bar_width, label=f'RX Queues PPS', color=rx_color)
 
-            ax.set_xlabel('Queue ID')
+            if pps is not None:
+                ax.axhline(y=float(pps), color='r',
+                           linestyle='--', label=f'Target PPS ({pps})')
+
+            ax.set_xlabel(f'Queue ID {n_qs}-TX / {n_qs} RX')
             ax.set_ylabel('Total PPS')
             ax.set_title(f'Mean PPS for POD-{side.upper()} Queue, Size {size}, Cores {cores} , pps {pps}')
-            ax.set_xticks(index)
-            ax.set_xticklabels([f'{i}' for i in range(n_queues)])
+            ax.set_xticks(range(n_qs * 2))
+            ax.set_xticklabels([f'{i}' for i in range(n_qs * 2)])
             ax.legend()
             ax.grid(True, which="both", ls="-")
+
+            plt.tight_layout()
+
+            if output:
+                plt.savefig(output)
+                print(f"Plot saved to {output}")
+            else:
+                plt.show()
+
+
+def plot_cpu_core_utilization(
+        dataset: dict,
+        size,
+        cores,
+        output=None,
+        pps=None,
+        side='tx',
+):
+    """ Plot cpu utilization per core,
+    direction either TX POD or RX POD.
+
+    :param dataset: Dictionary containing experiment data.
+    :param size: Size parameter for the plot.
+    :param cores: Cores used for the experiment.
+    :param output: Optional. Filepath to save the plot. If not provided, the plot will be displayed.
+    :param pps: Optional. PPS value for the plot.
+    :param side: Optional. Side parameter for the plot (default is 'tx').
+
+    :return: None
+    """
+
+    for key, details in dataset.items():
+        if (
+                details['size'] == size
+                and tuple(details['cores']) == tuple(cores)
+                and int(details['pps']) == int(pps)
+        ):
+            cpu_core_util = details[f'{side}_cpu']
+            n_cores = cpu_core_util.shape[1]
+            core_util_means = np.mean(cpu_core_util, axis=0)
+
+            fig, ax = plt.subplots(figsize=(12, 8))
+            index = np.arange(n_cores)
+            bar_width = 0.35
+
+            ax.bar(index, core_util_means, bar_width, label=f'Mean CPU Utilization')
+
+            ax.set_xlabel('Core ID')
+            ax.set_ylabel('Mean Utilization (%)')
+            ax.set_title(f'CPU Mean Core Utilization for '
+                         f'POD-{side.upper()} '
+                         f'Size {size}, '
+                         f'Cores {cores}, '
+                         f'Target PPS {pps}')
+            ax.set_xticks(index)
+            ax.set_xticklabels([f'{i}' for i in range(n_cores)])
+            ax.legend()
+            ax.grid(True, which="both", ls="-")
+
+            plt.tight_layout()
+
+            if output:
+                plt.savefig(output)
+                print(f"Plot saved to {output}")
+            else:
+                plt.show()
+
+
+def combine_cpu_interrupt_plots(
+        dataset: dict,
+        size,
+        cores,
+        output=None,
+        pps=None,
+        side='tx',
+):
+    """ Combine CPU utilization per core and interrupts per queue in one plot.
+    We compute percentage per queue, so we get percentage of interrupts on each queue.
+    Thus, some core will loaded from rate of interrupts.
+
+    :param dataset: Dictionary containing experiment data.
+    :param size: Size parameter for the plot.
+    :param cores: Cores used for the experiment.
+    :param output: Optional. Filepath to save the plot. If not provided, the plot will be displayed.
+    :param pps: Optional. PPS value for the plot.
+    :param side: Optional. Side parameter for the plot (default is 'tx').
+
+    :return: None
+    """
+    for key, details in dataset.items():
+        if (
+                details['size'] == size
+                and tuple(details['cores']) == tuple(cores)
+                and int(details['pps']) == int(pps)
+        ):
+            fig, ax1 = plt.subplots(figsize=(12, 8))
+
+            # utilization per core
+            cpu_core_util = details[f'{side}_cpu']
+            n_cores = cpu_core_util.shape[1]
+            core_util_means = np.mean(cpu_core_util, axis=0)
+
+            index = np.arange(n_cores)
+            bar_width = 0.35
+
+            ax1.bar(index, core_util_means, bar_width, label=f'Mean CPU Utilization')
+            ax1.set_xlabel('CPU ID')
+            ax1.set_ylabel('CPU Utilization (%)')
+            ax1.set_title(f'CPU Core Utilization % vs Interrupts % for '
+                          f'POD-{side.upper()} Queues\nSize {size}, '
+                          f'Cores {cores}, PPS {pps}')
+            ax1.set_xticks(index)
+            ax1.set_xticklabels([f'{i}' for i in range(n_cores)])
+            ax1.legend(loc='upper left')
+            ax1.grid(True, which="both", ls="-")
+
+            # Interrupts per queue and CPU.
+            m = details[f'{side}_pod_int']
+            n_queue = 9
+            n_cpu = m.shape[1]
+
+            n_chunks = len(m) // n_queue
+            reshaped_m = m.reshape(n_chunks, n_cpu, -1)
+            reshaped_m = np.swapaxes(reshaped_m, 0, 1)
+            strided_sum = np.sum(reshaped_m, axis=1)
+            strided_sum = strided_sum.reshape(n_queue, n_cpu)
+
+            # calculate interrupt percentages
+            total_interrupts = np.sum(strided_sum)
+            core_interrupt_percentages = (strided_sum * 100) / total_interrupts
+            core_interrupt_normalized = np.sum(core_interrupt_percentages, axis=0, keepdims=True)
+
+            # plot interrupts per core
+            bottom = np.zeros(n_cores)
+            for i in range(n_queue):
+                ax1.bar(index, core_interrupt_percentages[i],
+                        bar_width, label=f'Queue {i} Interrupts (%)', bottom=bottom)
+                bottom += core_interrupt_percentages[i]
+
+            ax1.set_ylabel('Percentage')
+            ax1.legend(loc='upper right')
+            ax1.grid(True, which="both", ls="-")
 
             plt.tight_layout()
 
@@ -693,25 +858,26 @@ def run_sampling(
     print("Sampling completed.")
 
 
-# def combine_server_files(files, output_file):
-#     with open(output_file, 'w') as outfile:
-#         for file in files:
-#             with open(file) as infile:
-#                 outfile.write(infile.read())
-
-def find_files(key, files_dict):
+def find_files(
+        key: tuple[int, int, int, int],
+        files_dict: dict
+):
     """
-    Find files corresponding to the given key in the files dictionary.
+    Find files corresponding to the given key in the dictionary.
+    Key is pps
 
     :param key: A tuple representing (pps, pairs, size, cores).
-    :param files_dict: A dictionary containing lists of files for different types (tx_pod_int, rx_pod_int, tx_queues, rx_queues).
+    :param files_dict: A dictionary containing lists of files for different types
+    (tx_pod_int, rx_pod_int, tx_queues, rx_queues).
     :return: A dictionary containing file lists for each type corresponding to the key.
     """
     pps, pairs, size, cores = key
     result_files = {}
 
     for file_type, files_list in files_dict.items():
-        found_files = [file for file in files_list if f"pr_{pps}_" in file and f"pairs_{pairs}_" in file
+        # format of file we expect
+        found_files = [file for file in files_list
+                       if f"pr_{pps}_" in file and f"pairs_{pairs}_" in file
                        and f"size_{size}_" in file and f"cores_{cores}_" in file]
         result_files[file_type] = found_files
 
@@ -843,7 +1009,8 @@ def merge_files(
     Merge all experiments files under the same experiment
     for server and client pods.
 
-    :param combined_files: A dictionary where keys are (PPS rate, number of pairs, size, cores, core list)
+    :param combined_files: A dictionary where keys are
+                           (PPS rate, number of pairs, size, cores, core list)
     tuples and values are lists of paths to combined files.
     :param metric_dir: The directory where the merged files will be saved.
     """
@@ -857,11 +1024,13 @@ def merge_files(
 
         if server_files:
             merge_file(server_files, f"tx_pps_{pps}_pairs_{pairs}_size_"
-                                     f"{size}_cores_{cores}_pods-cores_{cores_list_str}.log", metric_dir)
+                                     f"{size}_cores_{cores}_"
+                                     f"pods-cores_{cores_list_str}.log", metric_dir)
 
         if client_files:
             merge_file(client_files, f"rx_pps_{pps}_pairs_{pairs}_size_"
-                                     f"{size}_cores_{cores}_pods-cores_{cores_list_str}.log", metric_dir)
+                                     f"{size}_cores_{cores}_"
+                                     f"pods-cores_{cores_list_str}.log", metric_dir)
 
 
 def sample_entry(metric_dataset):
@@ -872,19 +1041,24 @@ def sample_entry(metric_dataset):
     """
     first_record = next(iter(metric_dataset.values()))
     print("Dimension of first record's tx_data:",
-          first_record['tx_data'].shape if first_record['tx_data'] is not None else None)
+          first_record['tx_data'].shape
+          if first_record['tx_data'] is not None else None)
     print("Dimension of first record's rx_data:",
-          first_record['rx_data'].shape if first_record['rx_data'] is not None else None)
+          first_record['rx_data'].shape
+          if first_record['rx_data'] is not None else None)
     print(first_record)
 
 
 def main(cmd):
-    """Run main , note sampling is optional arg, by default,
-    we read metric dir and plot all samples collected.
+    """Run main,
+     note sampling is optional arg, by default,
+     we read metric dir and plot all samples collected.
+
     :return:
     """
-    # if cmd.sample:
-    #     run_sampling(cmd.pps_values, cmd.cores)
+
+    if cmd.sample:
+        run_sampling(cmd.pps_values, cmd.cores)
 
     if cmd.output_dir:
         os.makedirs(cmd.output_dir, exist_ok=True)
@@ -900,42 +1074,69 @@ def main(cmd):
     if cmd.debug:
         sample_entry(metric_dataset)
 
-    # experiments_dir = os.path.join(directory, "experiments")
-    # if not os.path.exists(experiments_dir):
-    #     os.makedirs(experiments_dir)
+    experiments_dir = os.path.join(directory, "experiments")
+    if not os.path.exists(experiments_dir):
+        os.makedirs(experiments_dir)
 
-    # merge_files(combine_files, experiments_dir)
-    # metric_dataset = dataset_files(experiments_dir)
+    if cmd.print_metric:
+        print_metric(metric_dataset)
 
-    # if cmd.print_metric:
-    #     print_metric(metric_dataset)
-    #
-
-    # plot_stats(metric_dataset, "tx_bounded", plot_tx_bound, output_dir=cmd.output_dir)
-    # plot_stats(metric_dataset, "rx_bounded", plot_rx_bound, output_dir=cmd.output_dir)
-    # plot_stats(metric_dataset, "drop_bounded", plot_drop_rate, output_dir=cmd.output_dir)
-    # plot_stats(metric_dataset, "sw_irq_bounded", plot_irq_sw_irq_rate, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "tx_bounded", plot_tx_bound, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "rx_bounded", plot_rx_bound, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "drop_bounded", plot_drop_rate, output_dir=cmd.output_dir)
+    plot_stats(metric_dataset, "sw_irq_bounded", plot_irq_sw_irq_rate, output_dir=cmd.output_dir)
 
     all_pps_values = [details['pps'] for details in metric_dataset.values()]
+
     for pps in all_pps_values:
-        plot_stats(metric_dataset, "plot_tx_rx_interrupts", plot_tx_rx_interrupts,
+        plot_stats(metric_dataset,
+                   f"plot_txrx_interrupts_rx_pps_{pps}",
+                   plot_tx_rx_interrupts,
                    output_dir=cmd.output_dir,
                    pps=pps,
                    side='rx')
 
-        plot_stats(metric_dataset, "plot_tx_rx_interrupts", plot_tx_rx_interrupts,
+        plot_stats(metric_dataset,
+                   f"plot_txrx_interrupts_tx_pps_{pps}",
+                   plot_tx_rx_interrupts,
                    output_dir=cmd.output_dir,
                    pps=pps,
                    side='tx')
 
-    # all_pps_values = [details['pps'] for details in metric_dataset.values()]
     for pps in all_pps_values:
-        plot_stats(metric_dataset, "plot_queue_rate", plot_queue_rate,
+        plot_stats(metric_dataset,
+                   f"plot_rx_queue_rate_rx_pps_{pps}",
+                   plot_queue_rate,
                    output_dir=cmd.output_dir,
                    pps=pps,
                    side='rx')
 
-        plot_stats(metric_dataset, "plot_queue_rate", plot_queue_rate,
+        plot_stats(metric_dataset,
+                   f"plot_queue_rate_tx_pps_{pps}",
+                   plot_queue_rate,
+                   output_dir=cmd.output_dir,
+                   pps=pps,
+                   side='tx')
+
+    for pps in all_pps_values:
+        plot_stats(metric_dataset,
+                   f"plot_cpu_core_utilization_rx_pps_{pps}",
+                   plot_cpu_core_utilization,
+                   output_dir=cmd.output_dir,
+                   pps=pps,
+                   side='rx')
+
+        plot_stats(metric_dataset,
+                   f"plot_cpu_core_utilization_tx_pps_{pps}",
+                   plot_cpu_core_utilization,
+                   output_dir=cmd.output_dir,
+                   pps=pps,
+                   side='tx')
+
+    for pps in all_pps_values:
+        plot_stats(metric_dataset,
+                   f"combine_tx_cpu_interrupt_plots_{pps}",
+                   combine_cpu_interrupt_plots,
                    output_dir=cmd.output_dir,
                    pps=pps,
                    side='tx')
@@ -947,12 +1148,13 @@ if __name__ == "__main__":
     parser.add_argument('-p', '--print', dest='print_metric', action='store_true', help='Print metric dataset')
     parser.add_argument('-s', '--sample', action='store_true', help='Collect samples before processing metrics')
     parser.add_argument('--pps_values', nargs='*',
-                        type=int, default=[1000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000],
+                        type=int, default=[1000, 10000, 20000, 50000,
+                                           100000, 200000, 500000, 1000000],
                         help='List of PPS values for sampling')
     parser.add_argument('--cores', nargs='*',
                         type=int, default=[1, 2, 3, 4],
-                        help='List of num cores for sampling')
-    parser.add_argument('-o', '--output_dir', type=str, help='Output directory for plots')
+                        help='List of num cores for each pps value to run')
+    parser.add_argument('-o', '--output_dir', type=str, default='plots', help='Output directory for plots')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     args = parser.parse_args()
     main(args)

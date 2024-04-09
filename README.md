@@ -1,33 +1,55 @@
-# Benchmarking linux IP stack using trafgen.
+# Benchmark Kubernetes CNI and Linux IP stack using trafgen.
 
 ## Instruction
 
-This repo hosts a set of bash scripts and inference scripts that I use to benchmark the Linux IP stack. 
-This script requires access to kubeconfig, so make sure you update the KUBECONFIG env variable.
+This repo hosts a set of inference tools and bash scripts and inference scripts that I use to benchmark 
+the Linux IP stack and in Kubernetes environment, and maily focus for CNI performance.
+The scripts are designed to automate packet generation, data collection and metrics from pods, worker node,
 
-Our goal is to validate performance at different packet sizes/packet rates; hence, the set script 
-creates N traffic profiles for each POD during the initial phase. Later, each run consumes the same 
-profile and pass to trafgen; each run can change core affinity, packet size, packet rate.
+Please note script requires access to kubeconfig, and ssh access to a worker node.( by default 
+it assume no password authentication). 
+
+Goals validate performance at different packet sizes and packet rates; 
+identify potential blocker and source of packet drops or any other 
+bounds that can reduce performance.
+
+Thus, script creates N traffic profiles for each POD during the initial phase.  
+Later, each run consumes the generated profiles and pass to [https://github.com/netsniff-ng] trafgen
+each run can change core affinity, packet size, packet rate.
 
 All data is collected into separate files and later passed to inference offline mode to 
 perform a set of correlations and visualization.
+
+### Requirements
+
+- Python 3.6 or later
+- Kubeconfig
+- passwordless ssh access to worker nodes
+- static cpu pinning in kubelet.
+- worker node should have sudo access so it can read /procfs and /sysfs
 
 ## Usage
 
 First, create pods by running create_pods.sh script. This script will create N server and N client pods. 
 Then, run the generate_per_pod.sh script to generate the config for each pod. This script will be 
-copied to each pod  pkt_generate_template.sh
+copied to each pod **pkt_generate_template.sh**
 
-pkt_generate_template later executed. What this script does is first resolve the default gateway IP address.
-It will perform a single ICMP packet to resolve the ARP cache and arping. It will use the default gateway MAC address
-as the dst MAC address on the generated frame.
+The pkt_generate_template.sh is then executed on each pod, producing a set of traffic profiles. 
+Initially, the script resolves the default gateway IP address. It send a single ICMP packet transmission 
+to populate the ARP cache and uses arping. The default gateway MAC address is utilized as the destination 
+MAC address in the generated frame. Each pod receives a specific destination IP address, which create a one-to-one 
+mapping thus test generate a unidirectional flow from TX to RX POD In other words, there is a pair of N TX-RX sets, 
+where each server transmits traffic to its corresponding RX POD.
 
-Each pod is passed the destination IP address, so we have a 1:1 mapping between the server and the 
-client. i.e., we have a pair of N server clients for which each server will send traffic to its corresponding client.
+# Defaults.
+- By default, the script will create 3 TX and 3 RX pods.
+- Each TX and RX pod will have 4 core and 4 GB memory.
+- pkt_generate_template.sh will generate 4 profiles for 64, 128, 512, and 1024 byte frame sizes.
+- by default during run 64 byte frame size is used and single core per pod.
 
 ## Scripts
 
-- create_pods.sh - create pod executed from compute that has access to kubeconfig.
+- create_pods.sh - create pod and executed from compute that has access to kubeconfig.
 - generate_per_pod.sh - generate per pod config executed from compute that has access to kubeconfig.
 - run_monitor.sh - run monitor script executed from compute that has access to kubeconfig.
 - inference.py - inference script executed from compute that has access to kubeconfig.
@@ -35,8 +57,8 @@ client. i.e., we have a pair of N server clients for which each server will send
 - monitor_queue_rate.sh - executed inside each worker node ( i.e. script pushed to each worker node)
 - monitor_txrx_int.sh - executed inside each worker node ( i.e. script pushed to each worker node)
 
-- pkt_generate_template.sh - pushed to each pod
-- monitor_pps.sh - pushed to each pod
+- pkt_generate_template.sh - uploaded to each POD
+- monitor_pps.sh - uploaded to each POD
 - monitor_queue_rate.sh - pushed to each worker node
 - monitor_txrx_int.sh - pushed to each worker node
 
@@ -56,7 +78,7 @@ create_pods.sh
 generate_per_pod.sh
 ```
 
-By default, kubeconfig should be in same spot where all scripts.
+By default, kubeconfig should be in same spot where all scripts. 
 - generate_per_pod.sh will create 6 pod (default) 3 TX / 3 RX pod.
 - generate_per_pod.sh will create set of profile in tmp dir for 64/128/512/1024 frame size test.
 - serverX is sender, clientX is receiver and it 1:1 pair.
@@ -240,24 +262,21 @@ Assume we want use default core ( single core per trafgen)
 ./run_monitor_ssh.sh -p 1000000
 ```
 
-This will create 8 files in metric folder.
+During a run, in collection mode, data is gathered from each transmit (TX) and receive (RX) pod, 
+as well as from each worker node. This includes data samples from TX and RX queues, interrupts 
+per queue on both TX and RX pods, and core usage. All the data is formatted into a single vector, 
+which is then loaded into a NumPy array
 
-Example
+Note we have logs from POD and Worker node.
+
+### Example
 
 ```bash
-    rx_1000000pps_120_core_0_size_64_20240328122409.txt
-    rx_100000pps_120_core_0_size_64_20240328120635.txt
-    rx_10000pps_120_core_0_size_64_20240328120118.txt
-    rx_1000pps_120_core_0-1_size_64_20240328112149.txt
-    rx_1000pps_120_core_0_size_64_20240328115617.txt
-    rx_1200000pps_120_core_0_size_64_20240328122905.txt
-    rx_200000pps_120_core_0_size_64_20240328134551.txt
-    tx_1000000pps_120_core_0_size_64_20240328122409.txt
-    tx_100000pps_120_core_0_size_64_20240328120635.txt
-    tx_10000pps_120_core_0_size_64_20240328120118.txt
-    tx_1000pps_120_core_0-1_size_64_20240328112149.txt
-    tx_1200000pps_120_core_0_size_64_20240328122905.txt
-    tx_200000pps_120_core_0_size_64_20240328134551.txt
+  rx_1000000pps_120_core_0_size_64_20240328122409.txt
+  rx_100000pps_120_core_0_size_64_20240328120635.txt
+  rx_10000pps_120_core_0_size_64_20240328120118.txt
+  rx_1000pps_120_core_0-1_size_64_20240328112149.txt
+  rx_1000pps_120_core_0_size_64_20240328115617.txt
 ```
 
 ![TX Bounded](plots/tx_bounded_64_cores_4.png)
