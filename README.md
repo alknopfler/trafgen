@@ -6,27 +6,33 @@ This repo hosts a set of inference tools and bash scripts and inference scripts 
 the Linux IP stack and in Kubernetes environment, and maily focus for CNI performance.
 The scripts are designed to automate packet generation, data collection and metrics from pods, worker node,
 
-Please note script requires access to kubeconfig, and ssh access to a worker node.( by default 
-it assume no password authentication). 
+Please note script requires access to kubeconfig, and ssh access to a worker node.( by default it assume 
+no password authentication). 
 
-Goals validate performance at different packet sizes and packet rates; 
-identify potential blocker and source of packet drops or any other 
-bounds that can reduce performance.
+Goals validate performance at different packet sizes and packet rates; identify potential blocker and source 
+of packet drops or any other bounds that can reduce performance.
 
-Thus, script creates N traffic profiles for each POD during the initial phase.  
-Later, each run consumes the generated profiles and pass to [https://github.com/netsniff-ng] trafgen
-each run can change core affinity, packet size, packet rate.
+Thus, script creates N traffic profiles for each POD during the initial phase. Later, each run consumes 
+the generated profiles and pass to [https://github.com/netsniff-ng] trafgen each run can change core affinity, 
+packet size, packet rate.
 
-All data is collected into separate files and later passed to inference offline mode to 
-perform a set of correlations and visualization.
+All data is collected into separate files and later passed to inference tools for offline inference,  
+a set of correlations and visualization.
 
 ### Requirements
 
-- Python 3.6 or later
+- Python 3.9 or later
+- kubectl
 - Kubeconfig
 - passwordless ssh access to worker nodes
 - static cpu pinning in kubelet.
-- worker node should have sudo access so it can read /procfs and /sysfs
+- worker node should have sudo access, so it can read /procfs and /sysfs
+
+#### Customer image requirements
+- For custom pod image, scripts require following tools. 
+  numactl , ethtool, bash 3.2 or later, arping, ifconfig and trafgen.
+
+- For worker node all data collected via /procfs and /sysfs, and ethtool.
 
 ## Usage
 
@@ -64,10 +70,10 @@ where each server transmits traffic to its corresponding RX POD.
 
 ## Purpose
 
-- pkt_generate_template create all udp flow template, it needs access to src mac/dst mac, arp cache to generate right templates.
-- monitor_pps.sh - monitor script that will collect data from each pod, so we have viewed on TX / RX , interrupts , IRQ etc.
-- monitor_queue_rate.sh - identify TX or RX queue load in balance.
-- monitor_txrx_int.sh - identify TX / RX interrupts load and separation and balance.
+- **pkt_generate_template** create all udp flow template, it needs access to src mac/dst mac, arp cache to generate right templates.
+- **monitor_pps** - monitor script that will collect data from each pod, so we have viewed on TX / RX , interrupts , IRQ etc.
+- **monitor_queue_rate** - identify TX or RX queue load in balance.
+- **monitor_txrx_int** - identify TX / RX interrupts load and separation and balance.
 
 ### Initial setup
 
@@ -189,7 +195,7 @@ the server and client pods. The data is preprocessed for efficient loading into 
 function as a vector of observations.
 
 Concurrently, we collect the rate of observations on each Transmission (TX) and Reception (RX) queue, 
-monitoring their status per queue. Additionally, we gather interrupt rates per TX and RX queue per CPU.
+monitoring their status per queue. Additionally,  gather interrupt rates per TX and RX queue per CPU.
 
 All these logs are generated under the "metrics" directory.
 
@@ -214,7 +220,6 @@ are for TX and next 8 columns are for RX pod.
 1 1 0 6 2 5 8 7 1 1 0 6 2 5 8 7
 1 1 0 2 0 20 21 19 1 1 0 2 0 20 21 19
 ```
-
 
 Interrupt rate collected per TX and RX queue in logs tx_rx_int_rx
 Note this log collect from TX pod and RX pod.
