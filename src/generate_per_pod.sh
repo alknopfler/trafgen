@@ -114,9 +114,11 @@ while getopts ":s:d:ri:" opt; do
 done
 shift $((OPTIND -1))
 
+DEST_IPS=($(kubectl get pods -l role=client -o jsonpath='{.items[*].status.podIP}'))
+SERVER_IPS=($(kubectl get pods -l role=server -o jsonpath='{.items[*].status.podIP}'))
 
-DEST_IPS=($(kubectl get pods -o wide | grep 'client' | awk '{print $6}'))
-SERVER_IPS=($(kubectl get pods -o wide | grep 'server' | awk '{print $6}'))
+#DEST_IPS=($(kubectl get pods -o wide | grep 'client' | awk '{print $6}'))
+#SERVER_IPS=($(kubectl get pods -o wide | grep 'server' | awk '{print $6}'))
 
 server_pods=($(kubectl get pods | grep 'server' | awk '{print $1}'))
 client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
@@ -175,6 +177,7 @@ execute_in_parallel() {
 
             kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
             kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
+            echo " dst addr $dst_addr"
             kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp_$PD_SIZE.trafgen"
             kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
 
