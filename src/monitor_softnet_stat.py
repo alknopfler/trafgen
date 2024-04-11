@@ -2,47 +2,40 @@
 # Author Mus
 # mbayramov@vmware.com
 
-def process_softnet_stat(file_path):
+def process_soft_net_stat(file_path):
     """
+    Process and display softnet statistics from the given file.
 
-    :param file_path:
-    :return:
+    :param file_path: Path to the file containing softnet statistics.
     """
-    stat_map = {
-        0: 'sd->processed',
-        1: 'sd->dropped',
-        2: 'sd->time_squeeze',
-        3: '0',
-        4: '0',
-        5: '0',
-        6: '0',
-        7: '0',
-        8: '0',
-        9: 'sd->received_rps',
-        10: 'flow_limit_count',
-        11: 'softnet_backlog_len(sd)',
-        12: '(int)seq->index)'
-    }
+    stat_labels = [
+        'sd->processed',
+        'sd->dropped',
+        'sd->time_squeeze',
+        '0',
+        '0',
+        '0',
+        '0',
+        '0',
+        '0',
+        'sd->received_rps',
+        'flow_limit_count',
+        'softnet_backlog_len(sd)',
+        '(int)seq->index)'
+    ]
 
-    def calculate_justify_len(value):
-        return max(len(str(value)), 20)
+    with open(file_path) as file:
+        for cpu_index, line in enumerate(file):
+            print(f"CPU {cpu_index}")
+            stats = line.split()
 
-    with open(file_path) as f:
-        i = 0
-        for cpu in f:
-            print(f"CPU {i}")
-            stats = cpu.split(' ')
-            if len(stats) != len(stat_map):
-                continue
+            max_len = max(len(label) for label in stat_labels) + 5
+            for label, stat in zip(stat_labels, stats):
+                stat_int = int(stat, 16)
+                print(f"{label.ljust(max_len)} {stat_int}")
 
-            for j, stat in enumerate(stats):
-                justify_by = calculate_justify_len(stat)
-                print(stat_map[j].ljust(justify_by), end=' ')
-
-            print("\n")
-            i += 1
-
+            print("")
 
 if __name__ == "__main__":
     file_path = '/proc/net/softnet_stat'
-    process_softnet_stat(file_path)
+    process_soft_net_stat(file_path)
