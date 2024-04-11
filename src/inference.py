@@ -10,6 +10,8 @@
 """
 
 import os
+from typing import Optional
+
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
@@ -258,7 +260,7 @@ def plot_drop_rate(
         dataset: dict,
         size: int,
         cores: list[int],
-        output=None
+        output: Optional[str] = None
 ):
     """Plot PPS against drop rate for different target PPS values and cores.
     :param dataset: Dictionary containing file details.
@@ -304,17 +306,17 @@ def plot_tx_bound(
         dataset: dict,
         size: int,
         cores: list[int],
-        tolerance=0.02,
-        output=None
+        tolerance: Optional[float] = 0.02,
+        output: Optional[str] = None
 ):
     """Plot observed TX PPS against target PPS.  Here we cross correlate tx and target.
     i.e. identify for given core set what we reached.
 
-    :param output:
     :param dataset: Dictionary containing file details.
     :param size: Packet size for which experiments are conducted.
     :param cores: List of cores for which experiments are conducted.
-    :param tolerance:
+    :param tolerance: Tolerance value for the plot.
+    :param output: output path where we need save plot
     :return:
     """
 
@@ -363,8 +365,8 @@ def plot_rx_bound(
         dataset: dict,
         size,
         cores,
-        tolerance=0.02,
-        output=None
+        tolerance: Optional[float] = 0.02,
+        output: Optional[str] = None
 ):
     """ Plot a bar graph showing the target PPS, observed TX PPS, and observed RX PPS.
     Here we cross correlate TX / RX and target. Assume TX x and RX x while target y.
@@ -741,7 +743,7 @@ def plot_irq_sw_irq_rate(
         dataset: dict,
         size: int,
         cores: int,
-        output=None,
+        output: str = None,
 ):
     """Plots the IRQ and SIRQ rates for a given packet size and number of cores used.
 
