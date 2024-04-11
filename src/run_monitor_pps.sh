@@ -535,7 +535,7 @@ function kill_all_trafgen() {
     local pids
     pids=$(kubectl exec "$pod" -- pgrep -f trafgen)
     if [[ -n "$pids" ]]; then
-      echo "Killing trafgen process in pod $pod with PID(s): $pids"
+      echo "Killing trafgen process in pod $pod with PID(s): $(echo "$pids" | tr '\n' ' ')"
       kubectl exec "$pod" -- pkill -f trafgen > /dev/null 2>&1
     fi
   done
