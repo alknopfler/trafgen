@@ -36,6 +36,8 @@ OPT_MONITOR=""
 OPT_IS_LOOPBACK=""
 NUM_CORES="1"
 PACKET_SIZE="64"
+DEFAULT_IF_NAME="eth0"
+
 output_dir="metrics"
 
 ETHERNET_HEADER_SIZE=14
@@ -308,7 +310,7 @@ if [ "$NUM_CORES" -gt 1 ]; then
     default_core=$(expand_core_range "$task_set_core")
 fi
 
-# main routine called on start trafgen
+# Main routine called on start trafgen
 function run_trafgen() {
     local pps=$1
     local cmd
@@ -321,7 +323,7 @@ function run_trafgen() {
         cmd=""
     fi
 
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$NETWORK_INTERFACE" -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
     trafgen_pid=$!
 }
 
@@ -343,7 +345,7 @@ function run_trafgen_inter_pod() {
             cmd=""
         fi
 
-        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" $cmd /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
+        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$NETWORK_INTERFACE" -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
         local trafgen_pid_var="trafgen_pid$i"
         declare "$trafgen_pid_var"=$!
     done
