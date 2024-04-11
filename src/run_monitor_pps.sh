@@ -240,7 +240,7 @@ DEFAULT_INIT_PPS=10000
 trafgen_udp_file="/tmp/udp.loopback_$PD_SIZE.trafgen"
 trafgen_udp_file2="/tmp/udp_$PD_SIZE.trafgen"
 
-if [ "$RANDOMIZED_CONFIG" = "true" ]; then
+if [ "$RANDOMIZED_SRC_PORT" = "true" ]; then
     trafgen_udp_file2="/tmp/udp_$PD_SIZE.random.trafgen"
 fi
 
