@@ -102,12 +102,10 @@ generate_config() {
     local dst_ip
     local dst_ip_arr
     local total_length
-    local udp_length
 
     dst_ip="$DEST_IP"
     dst_ip_arr=($(echo "$dst_ip" | tr '.' ' '))
     total_length=$((20 + 8 + PD_SIZE))
-    udp_length=$((8 + PD_SIZE - 4))
 
     echo "#define ETH_P_IP 0x0800"
     echo "{"
@@ -126,9 +124,9 @@ generate_config() {
     get_src_ip_components
     echo ","
     echo "${dst_ip_arr[0]}, ${dst_ip_arr[1]}, ${dst_ip_arr[2]}, ${dst_ip_arr[3]},"
-    echo "const16($SRC_PORT),    /* UDP Source Port e.g. drnd(2)*/"
+    echo "const16($SRC_PORT), /* UDP Source Port e.g. drnd(2)*/"
     echo "const16($DST_PORT), /* UDP Dest Port */"
-    echo "const16($udp_length),"
+    echo "const16(26),   /* UDP length (UDP hdr 8 bytes + payload size */"
     echo "const16(0),"
     echo "fill('B', $PD_SIZE),"
     echo "}"
