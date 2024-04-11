@@ -15,6 +15,11 @@ if [ ! -f "$KUBECONFIG_FILE" ]; then
 fi
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+if ! command -v tmux &> /dev/null; then
+    echo "tmux is not installed. Please install tmux to use this script."
+    exit 1
+fi
+
 # loopback ( on same worker node)
 target_pod_name="server0"
 loopback_pod_name="server1"
