@@ -164,7 +164,7 @@ generate_randomized_config() {
     get_src_ip_components
     echo ","
     echo "${dst_ip_arr[0]}, ${dst_ip_arr[1]}, ${dst_ip_arr[2]}, ${dst_ip_arr[3]},"
-    echo "drnd(1),"
+    echo "drnd(2),"
     echo "const16($DST_PORT), /* UDP Dest Port */"
     echo "const16($udp_length),"
     echo "const16(0),"
