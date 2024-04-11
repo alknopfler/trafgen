@@ -843,8 +843,8 @@ def plot_stats(
 
 
 def run_sampling(
-        pps_values: list[int],
-        num_cores: list[int]
+        pps_values: List[int],
+        num_cores: List[int]
 ):
     """Rn sampling script for each target pps.
     :param pps_values: list of pps value we collect samples for.
@@ -996,7 +996,7 @@ def combine_file_names(directory):
 
 
 def merge_file(
-        files_list: list[str],
+        files_list: List[str],
         output_file_name: str,
         output_directory: str
 ):
