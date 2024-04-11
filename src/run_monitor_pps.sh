@@ -145,14 +145,16 @@ function expand_core_range() {
 }
 
 function display_help() {
-    echo "Usage: $0 -p <pps> [-s <seconds>] [-m] [-c <num_cores>]"
+    echo "Usage: $0 -p <pps> [-s <seconds>] [-m] [-c <num_cores>] [-n <num_pairs>] [-l] [-r] [-z <packet_size>]"
     echo "Options:"
     echo "  -p <pps>: Specify the packets per second (pps) rate."
     echo "  -s <seconds>: Specify the duration in seconds (default: $DEFAULT_TIMEOUT)."
     echo "  -m: Enable monitoring mode."
     echo "  -c <num_cores>: Specify the number of CPU cores to use (default: $NUM_CORES)."
-    echo "  -n Specify the number of server-client pairs (default: $DEFAULT_NUM_PAIRS)"
-    echo "  -r: Use randomized source port"
+    echo "  -n <num_pairs>: Specify the number of server-client pairs (default: $DEFAULT_NUM_PAIRS)."
+    echo "  -l: Enable loopback mode."
+    echo "  -r: Use randomized source port."
+    echo "  -z <packet_size>: Specify the packet size in bytes (e.g., 64/128/512/etc)."
     exit 1
 }
 
@@ -288,6 +290,7 @@ for _tx_pod_name in "${tx_pod_names[@]}"; do
         default_core_=$(expand_core_range "$task_set_core_")
     fi
 
+    echo " "
     echo " - Allocated for tx pod $_tx_pod_name cores: $default_core_ taskset cores: $task_set_core_"
     default_cores+=("$default_core_")
     task_set_cores+=("$task_set_core_")
@@ -393,6 +396,7 @@ function check_monitor_script() {
         printf '%s\n' "${missing_pods[@]}"
         exit 1
     else
+        echo " "
         echo "All receiver pods have the monitor script '/tmp/monitor_pps.sh'."
     fi
 }
@@ -524,19 +528,19 @@ function collect_queue_rates() {
 
     echo "Collecting queue rates and CPU utilization from workers at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
-    /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$tx_queue_output_file" &
+    /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$tx_queue_output_file" 2>&1 &
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$tx_cpu_output_file" 2>&1 &
 
     echo "Collecting queue rates and CPU utilization from workers at $timestamp..."
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
-    /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$rx_queue_output_file" &
+    /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$rx_queue_output_file" 2>&1 &
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$rx_cpu_output_file" 2>&1 &
 
     echo "Collecting soft net statistics from from workers at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
-    python /tmp/monitor_softnet_stat.py --concise -c > "$tx_soft_net_log" &
+    python /tmp/monitor_softnet_stat.py --concise -c > "$tx_soft_net_log" 2>&1 &
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     python /tmp/monitor_softnet_stat.py --concise -c > "$rx_soft_net_log" 2>&1 &
 }
@@ -629,8 +633,6 @@ else
      collect_tx_rx_int "$current_pps" "$NUM_CORES" "$DEFAULT_NUM_PAIRS" "$PACKET_SIZE" &
   fi
 fi
-
-echo "Waiting to complete $DEFAULT_TIMEOUT sec"
 
 wait
 exit 0
