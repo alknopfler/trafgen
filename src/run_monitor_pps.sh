@@ -152,10 +152,11 @@ function display_help() {
     echo "  -m: Enable monitoring mode."
     echo "  -c <num_cores>: Specify the number of CPU cores to use (default: $NUM_CORES)."
     echo "  -n Specify the number of server-client pairs (default: $DEFAULT_NUM_PAIRS)"
+    echo "  -r: Use randomized source port"
     exit 1
 }
 
-while getopts ":p:s:mc:n:lz:" opt; do
+while getopts ":p:s:mc:n:lrz:" opt; do
     case ${opt} in
         p)
             validate_integer "$OPTARG"
@@ -182,6 +183,9 @@ while getopts ":p:s:mc:n:lz:" opt; do
         l)
             OPT_IS_LOOPBACK="true"
            ;;
+        r)
+            RANDOMIZED_SRC_PORT="true"
+            ;;
         z)
             # we accept 64/128/512 etc.
             validate_integer "$OPTARG"
@@ -234,8 +238,11 @@ done
 DEFAULT_INIT_PPS=10000
 # loopback profile
 trafgen_udp_file="/tmp/udp.loopback_$PD_SIZE.trafgen"
-# inter pod profile
 trafgen_udp_file2="/tmp/udp_$PD_SIZE.trafgen"
+
+if [ "$RANDOMIZED_CONFIG" = "true" ]; then
+    trafgen_udp_file2="/tmp/udp_$PD_SIZE.random.trafgen"
+fi
 
 target_pod_interface="server0"
 uplink_interface="eth0"
