@@ -28,7 +28,7 @@ if [ ! -f "$KUBECONFIG_FILE" ]; then
 fi
 export KUBECONFIG="$KUBECONFIG_FILE"
 
-# by default we run for 128 sec
+# by default, we run for 128 sec
 DEFAULT_TIMEOUT="120"
 # default margin added to for monitor. i.e wait all trafgen to stop.
 DEFAULT_MONITOR_MARGIN="10"
