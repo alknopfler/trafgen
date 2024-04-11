@@ -74,17 +74,17 @@ function copy_queue_monitor() {
   tx_node_addr=$(kubectl get node "$tx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
   rx_node_addr=$(kubectl get node "$rx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
 
-  echo "Copying monitor_queue_rate script to pod $tx_node_addr"
+  echo "Copying monitor_queue_rate script to worker $tx_node_addr"
   scp monitor_queue_rate.sh "capv@$tx_node_addr:/tmp/monitor_queue_rate.sh"
-  echo "Copying monitor_queue_rate script to pod $rx_node_addr"
+  echo "Copying monitor_queue_rate script to worker $rx_node_addr"
   scp monitor_queue_rate.sh "capv@$rx_node_addr:/tmp/monitor_queue_rate.sh"
-  echo "Copying monitor_txrx_int script to pod $tx_node_addr"
+  echo "Copying monitor_txrx_int script to worker $tx_node_addr"
   scp monitor_txrx_int.sh "capv@$tx_node_addr:/tmp/monitor_txrx_int.sh"
-  echo "Copying monitor_txrx_int script to pod $rx_node_addr"
+  echo "Copying monitor_txrx_int script to worker $rx_node_addr"
   scp monitor_txrx_int.sh "capv@$rx_node_addr:/tmp/monitor_txrx_int.sh"
-  echo "Copying monitor_softnet_stat script to pod $tx_node_addr"
+  echo "Copying monitor_softnet_stat script to worker $tx_node_addr"
   scp monitor_softnet_stat.py "capv@$tx_node_addr:/tmp/monitor_softnet_stat.py"
-  echo "Copying monitor_softnet_stat script to pod $rx_node_addr"
+  echo "Copying monitor_softnet_stat script to worker $rx_node_addr"
   scp monitor_softnet_stat.py "capv@$rx_node_addr:/tmp/monitor_softnet_stat.py"
 }
 
