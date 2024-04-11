@@ -360,8 +360,9 @@ function run_trafgen_inter_pod() {
 }
 
 
-# Function check that each pod has monitor script
-# it will print all pod where script missing.
+# Function check that each tx and rx
+# pod has monitor script, it will print all
+# pod where script missing.
 function check_monitor_script() {
     local missing_pods=()
     for rx_pod_name in "${rx_pod_names[@]}"; do
@@ -462,7 +463,9 @@ function collect_pps_rate_all() {
       local target_cores="${task_set_cores[$pod_ith]}"
       local output_file="${output_dir}/server_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_core_list_${target_cores}_ts_${timestamp}.log"
 
-      echo "Starting collection from server pod $pod for core $target_cores ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps"
+      echo "Starting collection from server pod $pod for core "\
+      "$target_cores ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps"
+
       kubectl exec "$pod_id" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
       /tmp/monitor_pps.sh -i eth0 -d tuple> "$output_file" &
       ((pod_ith++))
@@ -546,7 +549,7 @@ function get_interface_stats() {
     ssh capv@"$tx_node_addr" cat /proc/net/dev | grep "$uplink_interface"
 }
 
-# kill all trafgen pids
+# Kill all trafgen pids
 function kill_all_trafgen() {
   local pods
   pods=$(kubectl get pods | grep 'server' | awk '{print $1}')
@@ -554,14 +557,14 @@ function kill_all_trafgen() {
     local kubectl_pid
     kubectl_pid=$(ps -ef | grep "kubectl exec $pod" | grep -v grep | awk '{print $2}')
     if [[ -n "$kubectl_pid" ]]; then
-      echo "Killing local kubectl process with PID: $kubectl_pid"
-      kill "$kubectl_pid" > /dev/null 2>&1
+      echo "Killing trafgen process in pod $pod with PID(s): $(echo "$kubectl_pid" | tr '\n' ' ')"
+      kill "$kubectl_pid" > /dev/null 2>&1 || true
     fi
-    local pids
-    pids=$(kubectl exec "$pod" -- pgrep -f trafgen)
-    if [[ -n "$pids" ]]; then
-      echo "Killing trafgen process in pod $pod with PID(s): $(echo "$pids" | tr '\n' ' ')"
-      kubectl exec "$pod" -- pkill -f trafgen > /dev/null 2>&1
+    local trafgen_pids
+    trafgen_pids=$(kubectl exec "$pod" -- pgrep -f trafgen)
+    if [[ -n "$trafgen_pids" ]]; then
+      echo "Killing trafgen process in pod $pod with PID(s): $(echo "$trafgen_pids" | tr '\n' ' ')"
+      kubectl exec "$pod" -- pkill -f trafgen > /dev/null 2>&1 || true
     fi
   done
 }
