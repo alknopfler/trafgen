@@ -28,7 +28,9 @@ if [ ! -f "$KUBECONFIG_FILE" ]; then
 fi
 export KUBECONFIG="$KUBECONFIG_FILE"
 
+# by default we run for 128 sec
 DEFAULT_TIMEOUT="120"
+# default margin added to for monitor. i.e wait all trafgen to stop.
 DEFAULT_MONITOR_MARGIN="10"
 OPT_PPS=""
 OPT_SEC=""
@@ -323,7 +325,7 @@ function run_trafgen() {
         cmd=""
     fi
 
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$NETWORK_INTERFACE" -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
     trafgen_pid=$!
 }
 
@@ -345,7 +347,7 @@ function run_trafgen_inter_pod() {
             cmd=""
         fi
 
-        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$NETWORK_INTERFACE" -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
+        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
         local trafgen_pid_var="trafgen_pid$i"
         declare "$trafgen_pid_var"=$!
     done
