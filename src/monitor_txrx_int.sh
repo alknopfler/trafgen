@@ -139,10 +139,8 @@ function collect() {
       echo "Error: Test file '$TEST_FILE' is empty."
       exit 1
     fi
-    echo "Reading interrupts data from test file: $TEST_FILE"
     read_from="$TEST_FILE"
   else
-    echo "Reading interrupts data from /proc/interrupts"
     read_from="/proc/interrupts"
   fi
 
@@ -152,7 +150,6 @@ function collect() {
 
   local num_queues
   num_queues=$(grep -c "$IF_NAME-rxtx" "$read_from")
-  echo "num_queues: $num_queues"
 
   while true; do
     local queue_id=0
