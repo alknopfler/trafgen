@@ -447,11 +447,7 @@ function collect_pps_rate_all() {
   for pod_id in "${client_pods[@]}"; do
       local target_cores
       local target_cores="${task_set_cores[$pod_ith]}"
-
-      local output_file="${output_dir}/client_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_"\
-      "cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_"\
-      "core_list_${target_cores}_ts_${timestamp}.log"
-
+      local output_file="${output_dir}/client_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_core_list_${target_cores}_ts_${timestamp}.log"
       echo "Starting collection from client pod $pod for core "\
       "$target_cores ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps"
 
@@ -464,8 +460,7 @@ function collect_pps_rate_all() {
   for pod_id in "${server_pods[@]}"; do
       local target_cores
       local target_cores="${task_set_cores[$pod_ith]}"
-      local output_file="${output_dir}/server_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_"\
-      "cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_core_list_${target_cores}_ts_${timestamp}.log"
+      local output_file="${output_dir}/server_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_core_list_${target_cores}_ts_${timestamp}.log"
 
       echo "Starting collection from server pod $pod for core $target_cores ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps"
       kubectl exec "$pod_id" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
