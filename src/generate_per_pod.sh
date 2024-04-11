@@ -76,6 +76,7 @@ function copy_queue_monitor() {
 
   echo "Copying monitor_queue_rate script to $tx_node_addr"
   scp monitor_queue_rate.sh "capv@$tx_node_addr:/tmp/monitor_queue_rate.sh"
+
   echo "Copying monitor_queue_rate script to $rx_node_addr"
   scp monitor_queue_rate.sh "capv@$rx_node_addr:/tmp/monitor_queue_rate.sh"
 
@@ -203,16 +204,19 @@ execute_in_parallel() {
 
             kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
             kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
-            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp_$PD_SIZE.trafgen"
+            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' \
+            /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp_$PD_SIZE.trafgen"
             kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
             # randomized udp flow
-            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} -r > /tmp/udp_$PD_SIZE.random.trafgen"
+            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' \
+            /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} -r > /tmp/udp_$PD_SIZE.random.trafgen"
 
             # loopback profile for the first server pod to
             # use the second server pod as destination. ( this executed only once )
             if [ "$pod_id" -eq 0 ]; then
                 dest_ip_loopback="${SERVER_IPS[1]}"
-                kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp.loopback_$PD_SIZE.trafgen"
+                kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' \
+                /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp.loopback_$PD_SIZE.trafgen"
                 kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
             fi
         ) &
