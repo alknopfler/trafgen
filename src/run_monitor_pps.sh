@@ -340,6 +340,8 @@ function run_trafgen() {
 # Main routine for inter-pod multi pod test
 function run_trafgen_inter_pod() {
     local pps=$1
+    declare -a trafgen_pids
+
     for i in "${!tx_pod_names[@]}"; do
         local _tx_pod_name="${tx_pod_names[$i]}"
         local _default_core="${default_cores[$i]}"
@@ -357,10 +359,20 @@ function run_trafgen_inter_pod() {
 
         kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" \
         /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i \
-        "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 || true &
+        "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
 
-        local trafgen_pid_var="trafgen_pid$i"
-        declare "$trafgen_pid_var"=$!
+        trafgen_pids+=($!)
+    done
+
+    sleep 1
+    echo "Checking if all trafgen processes have started..."
+    local started_pid
+    for started_pid in "${trafgen_pids[@]}"; do
+        if ps -p "$started_pid" > /dev/null 2>&1; then
+            echo "Process with PID $started_pid is running."
+        else
+            echo "Process with PID $started_pid failed to start."
+        fi
     done
 }
 
