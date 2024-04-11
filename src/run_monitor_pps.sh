@@ -538,9 +538,9 @@ function collect_queue_rates() {
 
     echo "Collecting soft net statistics from tx_node at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
-    python /path/to/monitor_softnet_stat.py --concise -c > "$tx_soft_net_log" &
+    python /tmp/monitor_softnet_stat.py --concise -c > "$tx_soft_net_log" &
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
-    python /path/to/monitor_softnet_stat.py --concise -c > "$rx_soft_net_log" &
+    python /tmp/monitor_softnet_stat.py --concise -c > "$rx_soft_net_log" &
 }
 
 # Function collect interrupt rate per TX and RX
