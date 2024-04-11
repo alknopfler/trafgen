@@ -630,7 +630,8 @@ else
   fi
 fi
 
+echo "Waiting to complete $DEFAULT_TIMEOUT sec"
+
 wait
 exit 0
-
 ##kill_all_trafgen
