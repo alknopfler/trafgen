@@ -337,17 +337,16 @@ function run_trafgen_inter_pod() {
         local _tx_pod_name="${tx_pod_names[$i]}"
         local _default_core="${default_cores[$i]}"
         local _task_set_core="${task_set_cores[$i]}"
-        local cmd
+        local opt_cmd
+        opt_cmd=""
 
         echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec taskset $_task_set_core dev $DEFAULT_IF_NAME profile $trafgen_udp_file2"
 
         if [ "$USE_TASKSET" == "true" ]; then
-            cmd="taskset -c $_task_set_core"
-        else
-            cmd=""
+            opt_cmd="taskset -c $_task_set_core"
         fi
 
-        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
+        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$opt_cmd" /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
         local trafgen_pid_var="trafgen_pid$i"
         declare "$trafgen_pid_var"=$!
     done
