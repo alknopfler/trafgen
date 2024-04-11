@@ -81,6 +81,9 @@ function copy_queue_monitor() {
 
   scp monitor_txrx_int.sh "capv@$tx_node_addr:/tmp/monitor_txrx_int.sh"
   scp monitor_txrx_int.sh "capv@$rx_node_addr:/tmp/monitor_txrx_int.sh"
+
+  scp monitor_softnet_stat.py "capv@$tx_node_addr:/tmp/monitor_softnet_stat.py"
+  scp monitor_softnet_stat.py "capv@$rx_node_addr:/tmp/monitor_softnet_stat.py"
 }
 
 regenerate_monitor=false
