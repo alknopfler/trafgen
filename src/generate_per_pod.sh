@@ -200,7 +200,6 @@ execute_in_parallel() {
 
             kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
             kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
-            echo " dst addr $dst_addr"
             kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp_$PD_SIZE.trafgen"
             kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
 
