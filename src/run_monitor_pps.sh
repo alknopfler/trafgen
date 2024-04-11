@@ -382,7 +382,7 @@ function check_monitor_script() {
 # monitor single pod
 function run_monitor() {
     echo "Starting monitor pod $tx_pod_name core $default_core"
-    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$task_set_core"
+    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i "$DEFAULT_IF_NAME" -c "$task_set_core"
 }
 
 # Execute monitors pps script on all receiver pods
@@ -411,12 +411,19 @@ function collect_pps_rate() {
     local pps=$1
     local timestamp
     timestamp=$(date +"%Y%m%d%H%M%S")
-    local rx_output_file="${output_dir}/rx_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.log"
-    local tx_output_file="${output_dir}/tx_${pps}pps_${DEFAULT_TIMEOUT}_core_${default_core}_size_${PACKET_SIZE}_${timestamp}.log"
+
+    local rx_output_file="${output_dir}/rx_${pps}pps_${DEFAULT_TIMEOUT}_core_"\
+    "${default_core}_size_${PACKET_SIZE}_${timestamp}.log"
+
+    local tx_output_file="${output_dir}/tx_${pps}pps_${DEFAULT_TIMEOUT}_core_"\
+    "${default_core}_size_${PACKET_SIZE}_${timestamp}.log"
+
     echo "txt $rx_pod_name for core $default_core ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps for RX direction"
 
-    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple -c "$default_core"> "$rx_output_file" &
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple -c "$default_core"> "$tx_output_file" &
+    kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    /tmp/monitor_pps.sh -i "$DEFAULT_IF_NAME" -d tuple -c "$default_core"> "$rx_output_file" &
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    /tmp/monitor_pps.sh -i "$DEFAULT_IF_NAME" -d tuple -c "$default_core"> "$tx_output_file" &
 }
 
 # Function collect stats from all client pods in multi pod config
@@ -440,9 +447,16 @@ function collect_pps_rate_all() {
   for pod_id in "${client_pods[@]}"; do
       local target_cores
       local target_cores="${task_set_cores[$pod_ith]}"
-      local output_file="${output_dir}/client_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_core_list_${target_cores}_ts_${timestamp}.log"
-      echo "Starting collection from client pod $pod for core $target_cores ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps"
-      kubectl exec "$pod_id" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple> "$output_file" &
+
+      local output_file="${output_dir}/client_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_"\
+      "cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_"\
+      "core_list_${target_cores}_ts_${timestamp}.log"
+
+      echo "Starting collection from client pod $pod for core "\
+      "$target_cores ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps"
+
+      kubectl exec "$pod_id" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+      /tmp/monitor_pps.sh -i "$DEFAULT_IF_NAME" -d tuple> "$output_file" &
       ((pod_ith++))
   done
 
@@ -450,9 +464,12 @@ function collect_pps_rate_all() {
   for pod_id in "${server_pods[@]}"; do
       local target_cores
       local target_cores="${task_set_cores[$pod_ith]}"
-      local output_file="${output_dir}/server_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_core_list_${target_cores}_ts_${timestamp}.log"
+      local output_file="${output_dir}/server_${pod_id}_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_"\
+      "cores_${num_cores}_pairs_${num_pairs}_size_${PACKET_SIZE}_core_list_${target_cores}_ts_${timestamp}.log"
+
       echo "Starting collection from server pod $pod for core $target_cores ${DEFAULT_MONITOR_TIMEOUT} sec with $pps pps"
-      kubectl exec "$pod_id" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -d tuple> "$output_file" &
+      kubectl exec "$pod_id" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+      /tmp/monitor_pps.sh -i eth0 -d tuple> "$output_file" &
       ((pod_ith++))
   done
 }
@@ -483,18 +500,47 @@ function collect_queue_rates() {
     local timestamp
     timestamp=$(date +"%Y%m%d%H%M%S")
 
-    local tx_queue_output_file="${output_dir}/tx-pod-queue_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
-    local rx_queue_output_file="${output_dir}/rx-pod-queue_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
-    local tx_cpu_output_file="${output_dir}/tx-pod-cpu_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
-    local rx_cpu_output_file="${output_dir}/rx-pod-cpu_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
+    local tx_queue_output_file="${output_dir}/tx-pod-queue_pr_${pps}_"\
+    "runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_"\
+    "size_${packet_size}_ts_${timestamp}.log"
+
+    local rx_queue_output_file="${output_dir}/rx-pod-queue_pr_${pps}_"\
+    "runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_"\
+    "size_${packet_size}_ts_${timestamp}.log"
+
+    local tx_cpu_output_file="${output_dir}/tx-pod-cpu_pr_${pps}_"\
+    "runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_"\
+    "size_${packet_size}_ts_${timestamp}.log"
+
+    local rx_cpu_output_file="${output_dir}/rx-pod-cpu_pr_${pps}_"\
+    "runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_"\
+    "size_${packet_size}_ts_${timestamp}.log"
+
+    local tx_soft_net_log="${output_dir}/tx_softnet_stat_${pps}_"\
+    "runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_"\
+    "size_${packet_size}_ts_${timestamp}.log"
+
+    local rx_soft_net_log="${output_dir}/rx_softnet_stat_${pps}_"\
+    "runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_"\
+    "size_${packet_size}_ts_${timestamp}.log"
 
     echo "Collecting queue rate and CPU utilization from tx_node at $timestamp..."
-    ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$tx_queue_output_file" &
-    ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$tx_cpu_output_file" &
+    ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$tx_queue_output_file" &
+    ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$tx_cpu_output_file" &
 
     echo "Collecting queue rate and CPU utilization from rx_node at $timestamp..."
-    ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$rx_queue_output_file" &
-    ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$rx_cpu_output_file" &
+    ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$rx_queue_output_file" &
+    ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$rx_cpu_output_file" &
+
+    echo "Collecting soft net statistics from tx_node at $timestamp..."
+    ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    python /path/to/monitor_softnet_stat.py --concise -c > "$tx_soft_net_log" &
+    ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+    python /path/to/monitor_softnet_stat.py --concise -c > "$rx_soft_net_log" &
 }
 
 # Function collect interrupt rate per TX and RX
