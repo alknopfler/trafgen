@@ -290,7 +290,6 @@ for _tx_pod_name in "${tx_pod_names[@]}"; do
         default_core_=$(expand_core_range "$task_set_core_")
     fi
 
-    echo " "
     echo " - Allocated for tx pod $_tx_pod_name cores: $default_core_ taskset cores: $task_set_core_"
     default_cores+=("$default_core_")
     task_set_cores+=("$task_set_core_")

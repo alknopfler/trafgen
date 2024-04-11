@@ -1,8 +1,10 @@
-# This script parse soft net stats col based on kernel version
-# and output to stdout in tabular format and provide option to sort
-# by rps, dropped, processed, flow_limit_count, cpu_collision etc
+# This script parse soft net stats , it detects data based on kernel version
+# and output to a stdout in tabular format and provide option to sort
+# by rps, dropped, processed, flow_limit_count, cpu_collision etc.
 #
-# Auto: Mus mbayramov@vmware.com
+# or vectorize per CPU core each row
+# This script executed during generation and data aggregate in logs.
+# Autor: Mus mbayramov@vmware.com
 import argparse
 import time
 
