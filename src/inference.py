@@ -471,7 +471,9 @@ def plot_tx_rx_interrupts(
             # stride across 9 to compute aggregate.
             # note interrupts in logs is rate sample each second
             m = details[f'{side}_pod_int']
-            n_queue = 9
+            n_queue = int(np.max(m[:, 0]) + 1)
+            m = m[:, 1:]
+
             n_cpu = m.shape[1]
             n_samples = m.shape[0]
 
@@ -700,7 +702,8 @@ def combine_cpu_interrupt_plots(
 
             # Interrupts per queue and CPU.
             m = details[f'{side}_pod_int']
-            n_queue = 9
+            n_queue = int(np.max(m[:, 0]) + 1)
+            m = m[:, 1:]
             n_cpu = m.shape[1]
 
             n_chunks = len(m) // n_queue
@@ -947,6 +950,11 @@ def combine_file_names(directory):
     rx_cpu_files = [file for file in os.listdir(directory)
                     if file.startswith('rx-pod-cpu') and file.endswith('.log')]
 
+    tx_softnet_files = [file for file in os.listdir(directory)
+                    if file.startswith('tx-softnet-stat') and file.endswith('.log')]
+    rx_softnet_files = [file for file in os.listdir(directory)
+                    if file.startswith('rx-softnet-stat') and file.endswith('.log')]
+
     # all stats per experiment collected from worker node
     files_dict = {
         'tx_pod_int': tx_pod_int_files,
@@ -954,7 +962,10 @@ def combine_file_names(directory):
         'tx_queues': tx_queues_files,
         'rx_queues': rx_queues_files,
         'tx_cpu': tx_cpu_files,
-        'rx_cpu': rx_cpu_files
+        'rx_cpu': rx_cpu_files,
+        'tx_softnet': tx_softnet_files,
+        'rx_softnet': rx_softnet_files
+
     }
 
     combined_files = {}

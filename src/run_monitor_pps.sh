@@ -522,8 +522,8 @@ function collect_queue_rates() {
     local rx_queue_output_file="${output_dir}/rx-pod-queue_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
     local tx_cpu_output_file="${output_dir}/tx-pod-cpu_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
     local rx_cpu_output_file="${output_dir}/rx-pod-cpu_pr_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
-    local tx_soft_net_log="${output_dir}/tx_softnet_stat_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
-    local rx_soft_net_log="${output_dir}/rx_softnet_stat_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
+    local tx_soft_net_log="${output_dir}/tx-softnet-stat_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
+    local rx_soft_net_log="${output_dir}/rx-softnet-stat_${pps}_runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_size_${packet_size}_ts_${timestamp}.log"
 
     echo "Collecting queue rates and CPU utilization from workers at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
