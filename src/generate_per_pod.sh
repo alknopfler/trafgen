@@ -198,7 +198,7 @@ execute_in_parallel() {
 # for different frame size
 function generate_traffic_profile() {
   local payload_sizes
-    payload_sizes=(64 128 512 1024)
+    payload_sizes=(64 128 256 512 1024)
     local frame_size
     for frame_size in "${payload_sizes[@]}"; do
         echo "Generating profile for frame size ${frame_size} bytes"

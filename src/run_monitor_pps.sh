@@ -41,6 +41,7 @@ output_dir="metrics"
 ETHERNET_HEADER_SIZE=14
 IP_HEADER_SIZE=20
 UDP_HEADER_SIZE=8
+USE_TASKSET="true"  # Set to "false" to disable taskset
 
 TOTAL_OVERHEAD=$((ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + UDP_HEADER_SIZE))
 
@@ -310,10 +311,20 @@ fi
 # main routine called on start trafgen
 function run_trafgen() {
     local pps=$1
+    local cmd
+
     echo "Starting on pod $tx_pod_name core $default_core with $pps pps for ${DEFAULT_TIMEOUT} sec"
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
+
+    if [ "$USE_TASKSET" == "true" ]; then
+        cmd="taskset -c $default_core"
+    else
+        cmd=""
+    fi
+
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
     trafgen_pid=$!
 }
+
 
 # Main routine for inter-pod multi pod test
 function run_trafgen_inter_pod() {
@@ -322,12 +333,22 @@ function run_trafgen_inter_pod() {
         local _tx_pod_name="${tx_pod_names[$i]}"
         local _default_core="${default_cores[$i]}"
         local _task_set_core="${task_set_cores[$i]}"
+        local cmd
+
         echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec taskset $_task_set_core"
-        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" taskset -c "$_task_set_core" /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
+
+        if [ "$USE_TASKSET" == "true" ]; then
+            cmd="taskset -c $_task_set_core"
+        else
+            cmd=""
+        fi
+
+        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" $cmd /usr/local/sbin/trafgen --cpp --dev eth0 -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
         local trafgen_pid_var="trafgen_pid$i"
         declare "$trafgen_pid_var"=$!
     done
 }
+
 
 # Function check that each pod has monitor script
 # it will print all pod where script missing.
