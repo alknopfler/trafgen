@@ -10,7 +10,7 @@
 """
 
 import os
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -864,7 +864,7 @@ def run_sampling(
 
 
 def find_files(
-        key: tuple[int, int, int, int],
+        key: Tuple[int, int, int, int],
         files_dict: dict
 ):
     """
