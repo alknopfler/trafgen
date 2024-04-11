@@ -1,12 +1,18 @@
 #!/bin/bash
 # Generate trafgen config per pod
-# This script execute script inside each container and populate two trafgen files.
+# This script execute script inside each container
+# and populate trafgen files.
 #
 # - src is base port and each pod offset from that.
 # - dst is base port and each pod offset from that.
+#
 # by default generate for 64 byte packet.
 # It also copies monitor_queue to each worker node.
 # i.e. script inside a POD need to know dst mac / dst ip etc.
+# -r will create profile with randomized src port
+# -i payload size. Note not a entire frame size , only payloads size.
+#
+# Autor:
 # Mus mbayramov@vmware.com
 
 DEFAULT_SRC_PORT="9"
