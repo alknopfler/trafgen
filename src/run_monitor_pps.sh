@@ -325,7 +325,7 @@ function run_trafgen() {
         cmd=""
     fi
 
-    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$cmd" /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
+    kubectl exec "$tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" $cmd /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file" --no-sock-mem --rate "${pps}pps" --bind-cpus "$default_core" -V -H > /dev/null 2>&1 &
     trafgen_pid=$!
 }
 
@@ -346,7 +346,7 @@ function run_trafgen_inter_pod() {
             opt_cmd="taskset -c $_task_set_core"
         fi
 
-        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "$opt_cmd" /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
+        kubectl exec "$_tx_pod_name" -- timeout "${DEFAULT_TIMEOUT}s" "${opt_cmd}" /usr/local/sbin/trafgen --cpp --dev "$DEFAULT_IF_NAME" -i "$trafgen_udp_file2" --no-sock-mem --rate "${pps}pps" --bind-cpus "$_default_core" -H > /dev/null 2>&1 &
         local trafgen_pid_var="trafgen_pid$i"
         declare "$trafgen_pid_var"=$!
     done
