@@ -339,7 +339,7 @@ function run_trafgen_inter_pod() {
         local _task_set_core="${task_set_cores[$i]}"
         local cmd
 
-        echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec taskset $_task_set_core"
+        echo "Starting on pod $_tx_pod_name with core $_default_core and pps $pps for ${DEFAULT_TIMEOUT} sec taskset $_task_set_core dev $DEFAULT_IF_NAME profile $trafgen_udp_file2"
 
         if [ "$USE_TASKSET" == "true" ]; then
             cmd="taskset -c $_task_set_core"
