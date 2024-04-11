@@ -8,6 +8,8 @@
 OPT_MONITOR=""
 INTERVAL=1
 IF_NAME="eth0"
+TEST_MODE=false
+TEST_FILE="test.int.data"
 
 function display_help() {
   echo "Usage: $0 <interface_name> [-i <interface_name>] [-m]"
@@ -16,15 +18,20 @@ function display_help() {
   echo "Options:"
   echo "  -i <interface_name>: Specify the interface name."
   echo "  -m: Monitor mode. Continuously monitor interrupts."
+  echo "  -t <test_file>: Test mode. Use the specified test file instead of /proc/interrupts."
+
 }
 
-while getopts "mi:" opt; do
+while getopts "mi:t" opt; do
   case ${opt} in
   i)
     IF_NAME="$OPTARG"
     ;;
   m)
     OPT_MONITOR="true"
+    ;;
+  t)
+    TEST_MODE="true"
     ;;
   \?)
     echo "Invalid option: -$OPTARG" >&2
@@ -38,10 +45,12 @@ while getopts "mi:" opt; do
 done
 shift $((OPTIND - 1))
 
-ethtool_output=$(ethtool -S "$IF_NAME")
-if [[ $? -ne 0 || -z $ethtool_output ]]; then
-  echo "Error: Unable to fetch ethtool counters for $IF_NAME."
-  exit 1
+if [ "$TEST_MODE" = false ]; then
+  ethtool_output=$(command -v ethtool >/dev/null && ethtool -S "$IF_NAME")
+  if [[ $? -ne 0 || -z $ethtool_output ]]; then
+    echo "Error: Unable to fetch ethtool counters for $IF_NAME."
+    exit 1
+  fi
 fi
 
 # store list of core for particular rxtx
@@ -54,7 +63,7 @@ interrupts_val_array=()
 # List of actual interrupt that each core did.
 #
 # Example:
-# This what awk produce we have N entities for each rxtx-eth0
+# This what awk produce, we have N entities for each rxtx-eth0
 #  0 0 0 0 0 0 0 0 0 0 0 2014823 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 243 0
 #  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 989567 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 114
 #  0 335 0 0 0 0 0 0 0 65083 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -65,8 +74,32 @@ interrupts_val_array=()
 #  0 0 0 0 0 0 32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 4991357 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 function tx_rx_interrupts() {
 
-  readarray -t cores_array < <(cat /proc/interrupts | awk -v iface="$IF_NAME" \
-  '$0 ~ iface { $1 = ""; sub(/IR-PCI-MSI /, ""); print substr($0, 2, length($0) - 26) }')
+  if [ "$TEST_MODE" = true ]; then
+    if [ ! -f "$TEST_FILE" ]; then
+      echo "Error: Test file '$TEST_FILE' not found."
+      exit 1
+    elif [ ! -s "$TEST_FILE" ]; then
+      echo "Error: Test file '$TEST_FILE' is empty."
+      exit 1
+    fi
+    echo "Reading interrupts data from test file: $TEST_FILE"
+    read_from="$TEST_FILE"
+  else
+    echo "Reading interrupts data from /proc/interrupts"
+    read_from="/proc/interrupts"
+  fi
+
+  local num_cpus
+  num_cpus=$(head -n 1 "$read_from" | grep -o 'CPU[0-9]\+' | wc -l)
+  num_cpus=$((num_cpus))
+
+  local num_queues
+  num_queues=$(grep -c "$IF_NAME-rxtx" "$read_from")
+  echo "num_queues: $num_queues"
+
+readarray -t cores_array < <(awk -v iface="$IF_NAME-rxtx" -v num_cpus="$num_cpus" \
+    '$0 ~ iface { for (i=2; i<=num_cpus + 1; i++) printf "%s ", $i; printf "\n" }' "$read_from")
+
   local _out_line
 
   for _out_line in "${cores_array[@]}"; do
@@ -81,7 +114,7 @@ function tx_rx_interrupts() {
       local _value
       _value="${values[rxtx_id]}"
       if [ "$_value" -gt 0 ]; then
-        interrupts+=("$((rxtx_id + 1))")
+        interrupts+=("$rxtx_id")
         interrupts_val+=("$_value")
       fi
     done
@@ -91,16 +124,44 @@ function tx_rx_interrupts() {
   done
 }
 
-# in collect mode we output entire vector with N col
+# Function collect mode we output entire vector with N col
 # where col is cpu ID
 function collect() {
+
+  if [ "$TEST_MODE" = true ]; then
+    if [ ! -f "$TEST_FILE" ]; then
+      echo "Error: Test file '$TEST_FILE' not found."
+      exit 1
+    elif [ ! -s "$TEST_FILE" ]; then
+      echo "Error: Test file '$TEST_FILE' is empty."
+      exit 1
+    fi
+    echo "Reading interrupts data from test file: $TEST_FILE"
+    read_from="$TEST_FILE"
+  else
+    echo "Reading interrupts data from /proc/interrupts"
+    read_from="/proc/interrupts"
+  fi
+
+  local num_cpus
+  num_cpus=$(head -n 1 "$read_from" | grep -o 'CPU[0-9]\+' | wc -l)
+  num_cpus=$((num_cpus))
+
+  local num_queues
+  num_queues=$(grep -c "$IF_NAME-rxtx" "$read_from")
+  echo "num_queues: $num_queues"
+
   while true; do
-    readarray -t cores_array < <(cat /proc/interrupts | awk -v iface="$IF_NAME" \
-      '$0 ~ iface { $1 = ""; sub(/IR-PCI-MSI /, ""); print substr($0, 2, length($0) - 26) }')
+    local queue_id=0
+    readarray -t cores_array < <(awk -v iface="$IF_NAME-rxtx" -v num_cpus="$num_cpus" \
+      '$0 ~ iface { printf "%d ", queue_id++; for (i=2; i<=num_cpus + 1; i++) printf "%s ", $i; printf "\n" }' "$read_from")
+
     local out_line
+
     for out_line in "${cores_array[@]}"; do
       echo "$out_line"
     done
+
     sleep "$INTERVAL"
   done
 }
