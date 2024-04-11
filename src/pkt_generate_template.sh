@@ -107,7 +107,7 @@ generate_config() {
     dst_ip="$DEST_IP"
     dst_ip_arr=($(echo "$dst_ip" | tr '.' ' '))
     total_length=$((20 + 8 + PD_SIZE))
-    udp_length=$((8 + PD_SIZE - 1))
+    udp_length=$((8 + PD_SIZE - 4))
 
     echo "#define ETH_P_IP 0x0800"
     echo "{"
