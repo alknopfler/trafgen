@@ -524,19 +524,19 @@ function collect_queue_rates() {
     "runtime_${DEFAULT_TIMEOUT}_cores_${num_cores}_pairs_${num_pairs}_"\
     "size_${packet_size}_ts_${timestamp}.log"
 
-    echo "Collecting queue rate and CPU utilization from tx_node at $timestamp..."
+    echo "Collecting queue rates and CPU utilization from workers at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$tx_queue_output_file" &
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$tx_cpu_output_file" &
 
-    echo "Collecting queue rate and CPU utilization from rx_node at $timestamp..."
+    echo "Collecting queue rates and CPU utilization from workers at $timestamp..."
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     /bin/bash /tmp/monitor_queue_rate.sh -t queue > "$rx_queue_output_file" &
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     /bin/bash /tmp/monitor_queue_rate.sh -t cpu > "$rx_cpu_output_file" &
 
-    echo "Collecting soft net statistics from tx_node at $timestamp..."
+    echo "Collecting soft net statistics from from workers at $timestamp..."
     ssh capv@"$tx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
     python /tmp/monitor_softnet_stat.py --concise -c > "$tx_soft_net_log" &
     ssh capv@"$rx_node_addr" timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
