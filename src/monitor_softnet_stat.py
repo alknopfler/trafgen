@@ -176,7 +176,7 @@ def main(cmd):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process and display soft net statistics.")
-    parser.add_argument("file_path", nargs='?', default='/proc/net/softnet_stats', help="Path to the soft net statistics file or proc")
+    parser.add_argument("file_path", nargs='?', default='/proc/net/softnet_stat', help="Path to the soft net statistics file or proc")
     sort_help_message = f"Column name to sort by (options: {', '.join(column_indices.keys())})"
     parser.add_argument("--sort", type=str, choices=column_indices.keys(), help=sort_help_message)
     parser.add_argument("--concise", action="store_true", help="Output the data in a concise format.")
