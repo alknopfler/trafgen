@@ -202,6 +202,8 @@ execute_in_parallel() {
             kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
             kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp_$PD_SIZE.trafgen"
             kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
+            # randomized udp flow
+            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} -r > /tmp/udp_$PD_SIZE.random.trafgen"
 
             # loopback profile for the first server pod to
             # use the second server pod as destination. ( this executed only once )

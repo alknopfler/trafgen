@@ -24,13 +24,15 @@ DST_PORT="$DEFAULT_DST_PORT"
 PD_SIZE="$DEFAULT_PD_SIZE"
 
 display_help() {
-    echo "Usage: $0 [-s <source port>] [-d <destination port>] [-p <payload size>]"
+    echo "Usage: $0 [-s <source port>] [-d <destination port>] [-p <payload size>] [-i <destination IP>] [-r]"
     echo "-s: Source port for UDP traffic"
     echo "-d: Destination port for UDP traffic"
     echo "-p: Payload size for UDP packets"
+    echo "-i: Destination IP for UDP packets"
+    echo "-r: Use randomized source port"
 }
 
-while getopts ":s:d:p:i:" opt; do
+while getopts ":s:d:p:i:r" opt; do
     case ${opt} in
         s)
             SRC_PORT=$OPTARG
@@ -43,6 +45,9 @@ while getopts ":s:d:p:i:" opt; do
             ;;
         i)
             DEST_IP=$OPTARG
+            ;;
+         r)
+            RANDOMIZED_CONFIG="true"
             ;;
         \?)
             display_help
@@ -166,4 +171,8 @@ generate_randomized_config() {
     echo "}"
 }
 
-generate_config
+if [ "$RANDOMIZED_CONFIG" = "true" ]; then
+    generate_randomized_config
+else
+    generate_config
+fi
