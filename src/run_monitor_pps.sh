@@ -38,6 +38,12 @@ NUM_CORES="1"
 PACKET_SIZE="64"
 output_dir="metrics"
 
+ETHERNET_HEADER_SIZE=14
+IP_HEADER_SIZE=20
+UDP_HEADER_SIZE=8
+
+TOTAL_OVERHEAD=$((ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + UDP_HEADER_SIZE))
+
 DEFAULT_PD_SIZE="22"
 # default payload size.
 PD_SIZE="$DEFAULT_PD_SIZE"
@@ -50,6 +56,16 @@ function validate_integer() {
     re='^[0-9]+$'
     if ! [[ $1 =~ $re ]] ; then
         echo "Error: Number must must be a positive integer." >&2; exit 1
+    fi
+}
+
+function calculate_payload_size() {
+    local packet_size=$1
+    if (( packet_size > TOTAL_OVERHEAD )); then
+        PD_SIZE=$((packet_size - TOTAL_OVERHEAD))
+    else
+        echo "Packet size too small to accommodate headers." >&2
+        exit 1
     fi
 }
 
@@ -134,7 +150,7 @@ function display_help() {
     exit 1
 }
 
-while getopts ":p:s:mc:n:l" opt; do
+while getopts ":p:s:mc:n:lz:" opt; do
     case ${opt} in
         p)
             validate_integer "$OPTARG"
@@ -161,6 +177,12 @@ while getopts ":p:s:mc:n:l" opt; do
         l)
             OPT_IS_LOOPBACK="true"
            ;;
+        z)
+            # we accept 64/128/512 etc.
+            validate_integer "$OPTARG"
+            PACKET_SIZE=$OPTARG
+            calculate_payload_size "$PACKET_SIZE"
+            ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
             display_help
@@ -504,9 +526,9 @@ function get_and_print_interface_stats() {
 
 echo " - Starting $DEFAULT_NUM_PAIRS pair, traffic generator with $OPT_PPS pps for $DEFAULT_TIMEOUT seconds."
 
+
 DEFAULT_INIT_PPS="$OPT_PPS"
 kill_all_trafgen
-
 
 current_pps="$DEFAULT_INIT_PPS"
 # in loopback mode monitor or collect
