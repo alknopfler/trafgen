@@ -385,7 +385,7 @@ function run_monitor() {
     kubectl exec "$rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 -c "$task_set_core"
 }
 
-# Monitors all receiver pods
+# Execute monitors pps script on all receiver pods
 # Each monitor write to own log and function tail all logs
 # in same console
 function run_monitor_all() {
@@ -393,7 +393,8 @@ function run_monitor_all() {
      local _rx_pod_name="${rx_pod_names[$i]}"
      local _default_core="${default_cores[$i]}"
      echo "Starting monitor on pod $_rx_pod_name with core $_default_core"
-     kubectl exec "$_rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" /tmp/monitor_pps.sh -i eth0 > "/tmp/monitor_${_rx_pod_name}.log" 2>&1 &
+     kubectl exec "$_rx_pod_name" -- timeout "${DEFAULT_MONITOR_TIMEOUT}s" \
+     /tmp/monitor_pps.sh -i eth0 > "/tmp/monitor_${_rx_pod_name}.log" 2>&1 &
     done
 
     local tail_cmd="tail -f"
