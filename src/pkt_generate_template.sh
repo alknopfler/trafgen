@@ -97,6 +97,45 @@ generate_config() {
     local dst_ip
     local dst_ip_arr
     local total_length
+    local udp_length
+
+    dst_ip="$DEST_IP"
+    dst_ip_arr=($(echo "$dst_ip" | tr '.' ' '))
+    total_length=$((20 + 8 + PD_SIZE))
+    udp_length=$((8 + PD_SIZE))
+
+    echo "#define ETH_P_IP 0x0800"
+    echo "{"
+    get_gateway_mac
+    echo ","
+    get_mac_eth0
+    echo ","
+    echo "const16(ETH_P_IP),"
+    echo "0b01000101, 0,  /* IPv4 Version, IHL, TOS */"
+    echo "const16($total_length),    /* IPv4 Total Len (UDP len + IP hdr 20 bytes)*/"
+    echo "const16(2),     /* IPv4 Ident */"
+    echo "0b01000000, 0,  /* IPv4 Flags, Frag Off */"
+    echo "64,             /* IPv4 TTL */"
+    echo "17,             /* Proto UDP */"
+    echo "csumip(14, 33), /* IPv4 Checksum (IP header from, to) */"
+    get_src_ip_components
+    echo ","
+    echo "${dst_ip_arr[0]}, ${dst_ip_arr[1]}, ${dst_ip_arr[2]}, ${dst_ip_arr[3]},"
+    echo "const16($SRC_PORT),    /* UDP Source Port e.g. drnd(2)*/"
+    echo "const16($DST_PORT), /* UDP Dest Port */"
+    echo "const16($udp_length),"
+    echo "const16(0),"
+    echo "fill('B', $PD_SIZE),"
+    echo "}"
+}
+
+
+# generate config
+generate_randomized_config() {
+    local dst_ip
+    local dst_ip_arr
+    local total_length
+    local udp_length
 
     dst_ip="$DEST_IP"
     dst_ip_arr=($(echo "$dst_ip" | tr '.' ' '))
@@ -119,9 +158,9 @@ generate_config() {
     get_src_ip_components
     echo ","
     echo "${dst_ip_arr[0]}, ${dst_ip_arr[1]}, ${dst_ip_arr[2]}, ${dst_ip_arr[3]},"
-    echo "const16($SRC_PORT),    /* UDP Source Port e.g. drnd(2)*/"
+    echo "drnd(1),"
     echo "const16($DST_PORT), /* UDP Dest Port */"
-    echo "const16(26),   /* UDP length (UDP hdr 8 bytes + payload size */"
+    echo "const16($udp_length),"
     echo "const16(0),"
     echo "fill('B', $PD_SIZE),"
     echo "}"
