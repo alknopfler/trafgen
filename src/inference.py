@@ -10,7 +10,7 @@
 """
 
 import os
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -259,7 +259,7 @@ def print_metric(dataset):
 def plot_drop_rate(
         dataset: dict,
         size: int,
-        cores: list[int],
+        cores: List[int],
         output: Optional[str] = None
 ):
     """Plot PPS against drop rate for different target PPS values and cores.
@@ -305,7 +305,7 @@ def plot_drop_rate(
 def plot_tx_bound(
         dataset: dict,
         size: int,
-        cores: list[int],
+        cores: List[int],
         tolerance: Optional[float] = 0.02,
         output: Optional[str] = None
 ):
