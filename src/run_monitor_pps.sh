@@ -369,9 +369,9 @@ function run_trafgen_inter_pod() {
     local started_pid
     for started_pid in "${trafgen_pids[@]}"; do
         if ps -p "$started_pid" > /dev/null 2>&1; then
-            echo "Trafgen process with PID $started_pid is running."
+            echo " - Trafgen process with PID $started_pid is running."
         else
-            echo "Trafgen process with PID $started_pid failed to start."
+            echo "- Trafgen process with PID $started_pid failed to start."
         fi
     done
 }
