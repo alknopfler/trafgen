@@ -25,7 +25,6 @@ function populate_node_ips() {
 }
 
 populate_node_ips
-echo "Unique Node IPs: ${node_ips[@]}"
 
 rx_ring_size=4096
 tx_ring_size=4096
@@ -38,4 +37,5 @@ for ip in "${node_ips[@]}"; do
     echo "Setting ring buffer sizes on node with IP: $ip"
     ssh capv@"$ip" sudo ethtool -G eth0 rx $rx_ring_size tx $tx_ring_size rx-mini $rx_mini_ring_size
     ssh capv@"$ip" sudo apt install numactl
+    ssh capv@"$ip" sudo tc qdisc replace dev eth0 root fq_codel
 done
