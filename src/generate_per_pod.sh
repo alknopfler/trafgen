@@ -123,6 +123,29 @@ SERVER_IPS=($(kubectl get pods -l role=server -o jsonpath='{.items[*].status.pod
 server_pods=($(kubectl get pods | grep 'server' | awk '{print $1}'))
 client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
 
+validate_ip_array() {
+    local ips=("$@")
+    local ip_pattern='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+
+    for ip_addr in "${ips[@]}"; do
+        if [[ ! $ip_addr =~ $ip_pattern ]]; then
+            echo "Invalid IP address detected: $ip_addr"
+            return 1
+        fi
+    done
+    return 0
+}
+
+if ! validate_ip_array "${DEST_IPS[@]}"; then
+    echo "Validation error in DEST_IPS"
+    exit 1
+fi
+
+if ! validate_ip_array "${SERVER_IPS[@]}"; then
+    echo "Validation error in SERVER_IPS"
+    exit 1
+fi
+
 if [ ${#server_pods[@]} -ne ${#DEST_IPS[@]} ]; then
     echo "The number of server pods and destination IPs do not match."
     exit 1
