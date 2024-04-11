@@ -89,6 +89,9 @@ function tx_rx_interrupts() {
     read_from="/proc/interrupts"
   fi
 
+  interrupts_core_array=()
+  interrupts_val_array=()
+
   local num_cpus
   num_cpus=$(head -n 1 "$read_from" | grep -o 'CPU[0-9]\+' | wc -l)
   num_cpus=$((num_cpus))
