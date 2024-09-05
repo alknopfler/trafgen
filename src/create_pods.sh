@@ -21,7 +21,7 @@
 # Author Mus
 # mbayramov@vmware.com
 
-KUBECONFIG_FILE="kubeconfig"
+KUBECONFIG_FILE="/etc/rancher/rke2/rke2.yaml"
 if [ ! -f "$KUBECONFIG_FILE" ]; then
     echo "kubeconfig file not found in the current directory."
     exit 1
@@ -35,6 +35,7 @@ kubectl get pods -o=name | grep -E 'client|server' | xargs kubectl delete
 mkdir -p pods
 
 # default per pod.
+POD_NAMESPACE="flexran"
 DEFAULT_CPU_LIMIT="4"
 DEFAULT_MEM_LIMIT="4000Mi"
 DEFAULT_CPU_REQ="4"
@@ -113,12 +114,12 @@ fi
 if [ "$OPT_SAME_NODE" = "false" ]; then
     while IFS= read -r line; do
         nodes+=("$line")
-    done < <(kubectl get nodes --selector='!node-role.kubernetes.io/control-plane' --no-headers | awk '{print $1}')
+    done < <(kubectl get nodes --no-headers | awk '{print $1}')
     server_node=${nodes[0]}
     client_node=${nodes[1]}
 else
     echo "Deploying all pod on same node"
-    server_node=$(kubectl get nodes --selector='!node-role.kubernetes.io/control-plane' --no-headers | awk 'NR==1{print $1}')
+    server_node=$(kubectl get nodes --selector='node-role.kubernetes.io/control-plane' --no-headers | awk 'NR==1{print $1}')
     client_node=$server_node
 fi
 
@@ -127,7 +128,7 @@ do
     server_name="server$i"
     client_name="client$i"
 
-    sed "s|{{server-name}}|$server_name|g; s|{{node-name}}|$server_node|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" pod-server-template.yaml > "pods/pod-$server_name.yaml"
+    sed "s|{{pod-namespace}}|$POD_NAMESPACE|g; s|{{server-name}}|$server_name|g; s|{{node-name}}|$server_node|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" pod-server-template.yaml > "pods/pod-$server_name.yaml"
 
     if [ "$OPT_SAME_NODE" = "true" ]; then
         TEMPLATE_FILE="pod-client-template-same_node.yaml"
@@ -135,9 +136,8 @@ do
         TEMPLATE_FILE="pod-client-template.yaml"
     fi
 
-    sed "s|{{client-name}}|$client_name|g; s|{{node-name}}|$client_node|g; s|{{server-name}}|$server_name|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" $TEMPLATE_FILE > "pods/pod-$client_name.yaml"
+    sed "s|{{pod-namespace}}|$POD_NAMESPACE|g; s|{{client-name}}|$client_name|g; s|{{node-name}}|$client_node|g; s|{{server-name}}|$server_name|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" $TEMPLATE_FILE > "pods/pod-$client_name.yaml"
 
     kubectl apply -f "pods/pod-$server_name.yaml"
     kubectl apply -f "pods/pod-$client_name.yaml"
 done
-

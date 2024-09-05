@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 # Generate trafgen config per pod
 # This script execute script inside each container
 # and populate trafgen files.
@@ -15,6 +16,8 @@
 # Autor:
 # Mus mbayramov@vmware.com
 
+POD_NAMESPACE="flexran"
+
 DEFAULT_SRC_PORT="9"
 DEFAULT_DST_PORT="6666"
 
@@ -27,7 +30,7 @@ PD_SIZE="$DEFAULT_PD_SIZE"
 target_pod_name="server0"
 client_pod_name="client0"
 
-KUBECONFIG_FILE="kubeconfig"
+KUBECONFIG_FILE="/etc/rancher/rke2/rke2.yaml"
 if [ ! -f "$KUBECONFIG_FILE" ]; then
     echo "kubeconfig file not found in the current directory."
     exit 1
@@ -69,29 +72,29 @@ function copy_queue_monitor() {
   local rx_pod_full_name
 
   # pod name
-  tx_pod_full_name=$(kubectl get pods | grep "$target_pod_name" | awk '{print $1}')
-  rx_pod_full_name=$(kubectl get pods | grep "$client_pod_name" | awk '{print $1}')
+  tx_pod_full_name=$(kubectl get pods -n $POD_NAMESPACE | grep "$target_pod_name" | awk '{print $1}')
+  rx_pod_full_name=$(kubectl get pods -n $POD_NAMESPACE | grep "$client_pod_name" | awk '{print $1}')
 
   # node name
-  tx_node_name=$(kubectl get pod "$tx_pod_full_name" -o=jsonpath='{.spec.nodeName}')
-  rx_node_name=$(kubectl get pod "$rx_pod_full_name" -o=jsonpath='{.spec.nodeName}')
+  tx_node_name=$(kubectl get pod -n $POD_NAMESPACE "$tx_pod_full_name" -o=jsonpath='{.spec.nodeName}')
+  rx_node_name=$(kubectl get pod -n $POD_NAMESPACE "$rx_pod_full_name" -o=jsonpath='{.spec.nodeName}')
 
   # node address
-  tx_node_addr=$(kubectl get node "$tx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
-  rx_node_addr=$(kubectl get node "$rx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+  tx_node_addr=$(kubectl get node -n $POD_NAMESPACE "$tx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+  rx_node_addr=$(kubectl get node -n $POD_NAMESPACE "$rx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
 
   echo "Copying monitor_queue_rate script to worker $tx_node_addr"
-  scp monitor_queue_rate.sh "capv@$tx_node_addr:/tmp/monitor_queue_rate.sh"
+  scp monitor_queue_rate.sh "root@$tx_node_addr:/tmp/monitor_queue_rate.sh"
   echo "Copying monitor_queue_rate script to worker $rx_node_addr"
-  scp monitor_queue_rate.sh "capv@$rx_node_addr:/tmp/monitor_queue_rate.sh"
+  scp monitor_queue_rate.sh "root@$rx_node_addr:/tmp/monitor_queue_rate.sh"
   echo "Copying monitor_txrx_int script to worker $tx_node_addr"
-  scp monitor_txrx_int.sh "capv@$tx_node_addr:/tmp/monitor_txrx_int.sh"
+  scp monitor_txrx_int.sh "root@$tx_node_addr:/tmp/monitor_txrx_int.sh"
   echo "Copying monitor_txrx_int script to worker $rx_node_addr"
-  scp monitor_txrx_int.sh "capv@$rx_node_addr:/tmp/monitor_txrx_int.sh"
+  scp monitor_txrx_int.sh "root@$rx_node_addr:/tmp/monitor_txrx_int.sh"
   echo "Copying monitor_softnet_stat script to worker $tx_node_addr"
-  scp monitor_softnet_stat.py "capv@$tx_node_addr:/tmp/monitor_softnet_stat.py"
+  scp monitor_softnet_stat.py "root@$tx_node_addr:/tmp/monitor_softnet_stat.py"
   echo "Copying monitor_softnet_stat script to worker $rx_node_addr"
-  scp monitor_softnet_stat.py "capv@$rx_node_addr:/tmp/monitor_softnet_stat.py"
+  scp monitor_softnet_stat.py "root@$rx_node_addr:/tmp/monitor_softnet_stat.py"
 }
 
 regenerate_monitor=false
@@ -125,14 +128,14 @@ while getopts ":s:d:ri:" opt; do
 done
 shift $((OPTIND -1))
 
-DEST_IPS=($(kubectl get pods -l role=client -o jsonpath='{.items[*].status.podIP}'))
-SERVER_IPS=($(kubectl get pods -l role=server -o jsonpath='{.items[*].status.podIP}'))
+DEST_IPS=($(kubectl get pods -n $POD_NAMESPACE -l role=client -o jsonpath='{.items[*].status.podIP}'))
+SERVER_IPS=($(kubectl get pods -n $POD_NAMESPACE -l role=server -o jsonpath='{.items[*].status.podIP}'))
 
 #DEST_IPS=($(kubectl get pods -o wide | grep 'client' | awk '{print $6}'))
 #SERVER_IPS=($(kubectl get pods -o wide | grep 'server' | awk '{print $6}'))
 
-server_pods=($(kubectl get pods | grep 'server' | awk '{print $1}'))
-client_pods=($(kubectl get pods | grep 'client' | awk '{print $1}'))
+server_pods=($(kubectl get pods -n $POD_NAMESPACE | grep 'server' | awk '{print $1}'))
+client_pods=($(kubectl get pods -n $POD_NAMESPACE | grep 'client' | awk '{print $1}'))
 
 validate_ip_array() {
     local ips=("$@")
@@ -169,8 +172,8 @@ function copy_pps_monitor() {
     client_pod="${client_pods[$cid]}"
     echo "Copying monitor script to $client_pod"
     (
-      kubectl cp monitor_pps.sh "$client_pod":/tmp/monitor_pps.sh
-      kubectl exec "$client_pod" -- chmod +x /tmp/monitor_pps.sh
+      kubectl cp -n $POD_NAMESPACE monitor_pps.sh "$client_pod":/tmp/monitor_pps.sh
+      kubectl exec -n -n $POD_NAMESPACE "$client_pod" -- chmod +x /tmp/monitor_pps.sh
     ) &
   done
 
@@ -180,8 +183,8 @@ function copy_pps_monitor() {
     server_pod="${server_pods[$sid]}"
     echo "Copying monitor script to $server_pod"
     (
-      kubectl cp monitor_pps.sh "$server_pod":/tmp/monitor_pps.sh
-      kubectl exec "$server_pod" -- chmod +x /tmp/monitor_pps.sh
+      kubectl cp -n $POD_NAMESPACE monitor_pps.sh "$server_pod":/tmp/monitor_pps.sh
+      kubectl exec -n $POD_NAMESPACE "$server_pod" -- chmod +x /tmp/monitor_pps.sh
     ) &
   done
   wait
@@ -206,25 +209,25 @@ execute_in_parallel() {
           SRC_PORT=$((1024 + pod_id))
           DST_PORT=$((1024 + pod_id))
         (
-            kubectl cp pkt_generate_template.sh "$pod":/tmp/pkt_generate_template.sh
-            kubectl exec "$pod" -- chmod +x /tmp/pkt_generate_template.sh
+            kubectl cp -n $POD_NAMESPACE pkt_generate_template.sh "$pod":/tmp/pkt_generate_template.sh
+            kubectl exec -n $POD_NAMESPACE "$pod" -- chmod +x /tmp/pkt_generate_template.sh
 
-            kubectl cp monitor_pps.sh "$pod":/tmp/monitor_pps.sh
-            kubectl exec "$pod" -- chmod +x /tmp/monitor_pps.sh
-            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' \
+            kubectl cp -n $POD_NAMESPACE monitor_pps.sh "$pod":/tmp/monitor_pps.sh
+            kubectl exec -n $POD_NAMESPACE "$pod" -- chmod +x /tmp/monitor_pps.sh
+            kubectl exec -n $POD_NAMESPACE "$pod" -- sh -c "env DEST_IP='$dst_addr' \
             /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp_$PD_SIZE.trafgen"
-            kubectl exec "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
+            kubectl exec -n $POD_NAMESPACE "$pod" -- cat /tmp/udp_"$PD_SIZE".trafgen
             # randomized udp flow
-            kubectl exec "$pod" -- sh -c "env DEST_IP='$dst_addr' \
+            kubectl exec -n $POD_NAMESPACE "$pod" -- sh -c "env DEST_IP='$dst_addr' \
             /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} -r > /tmp/udp_$PD_SIZE.random.trafgen"
 
             # loopback profile for the first server pod to
             # use the second server pod as destination. ( this executed only once )
             if [ "$pod_id" -eq 0 ]; then
                 dest_ip_loopback="${SERVER_IPS[1]}"
-                kubectl exec "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' \
+                kubectl exec -n $POD_NAMESPACE "$pod" -- sh -c "env DEST_IP='$dest_ip_loopback' \
                 /tmp/pkt_generate_template.sh -p ${PD_SIZE} -s ${SRC_PORT} -d ${DST_PORT} > /tmp/udp.loopback_$PD_SIZE.trafgen"
-                kubectl exec "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
+                kubectl exec -n $POD_NAMESPACE "$pod" -- cat /tmp/udp.loopback_"$PD_SIZE".trafgen
             fi
         ) &
         ((pod_id++))
