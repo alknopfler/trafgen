@@ -9,7 +9,6 @@ metadata:
     request_user: root
     role: client
   name: {{client-name}}-ve-56377f29-e603-11ee-a122-179ee4765847
-  namespace: {{pod-namespace}}
 spec:
   affinity:
     podAntiAffinity:

@@ -21,7 +21,7 @@
 # Author Mus
 # mbayramov@vwmware.com
 
-KUBECONFIG_FILE="kubeconfig"
+KUBECONFIG_FILE="/etc/rancher/rke2/rke2.yaml"
 if [ ! -f "$KUBECONFIG_FILE" ]; then
     echo "kubeconfig file not found in the current directory."
     exit 1
@@ -38,7 +38,7 @@ OPT_MONITOR=""
 OPT_IS_LOOPBACK=""
 NUM_CORES="1"
 PACKET_SIZE="64"
-DEFAULT_IF_NAME="eth0"
+DEFAULT_IF_NAME="eth2"
 
 output_dir="metrics"
 
@@ -265,8 +265,8 @@ done
 tx_node_name=$(kubectl get pod "$tx_pod_name" -o=jsonpath='{.spec.nodeName}')
 rx_node_name=$(kubectl get pod "$rx_pod_name" -o=jsonpath='{.spec.nodeName}')
 
-tx_node_addr=$(kubectl get node "$tx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
-rx_node_addr=$(kubectl get node "$rx_node_name" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+tx_node_addr=$(kubectl get node "$tx_node_name" -o jsonpath='{.status.addresses[0].address}')
+rx_node_addr=$(kubectl get node "$rx_node_name" -o jsonpath='{.status.addresses[0].address}')
 
 default_core=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind' | awk '{print $2}')
 default_core_list=$(kubectl exec "$tx_pod_name" -- numactl -s | grep 'physcpubind')

@@ -35,7 +35,6 @@ kubectl get pods -o=name | grep -E 'client|server' | xargs kubectl delete
 mkdir -p pods
 
 # default per pod.
-POD_NAMESPACE="flexran"
 DEFAULT_CPU_LIMIT="4"
 DEFAULT_MEM_LIMIT="4000Mi"
 DEFAULT_CPU_REQ="4"
@@ -128,7 +127,7 @@ do
     server_name="server$i"
     client_name="client$i"
 
-    sed "s|{{pod-namespace}}|$POD_NAMESPACE|g; s|{{server-name}}|$server_name|g; s|{{node-name}}|$server_node|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" pod-server-template.yaml > "pods/pod-$server_name.yaml"
+    sed "s|{{server-name}}|$server_name|g; s|{{node-name}}|$server_node|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" pod-server-template.yaml > "pods/pod-$server_name.yaml"
 
     if [ "$OPT_SAME_NODE" = "true" ]; then
         TEMPLATE_FILE="pod-client-template-same_node.yaml"
@@ -136,7 +135,7 @@ do
         TEMPLATE_FILE="pod-client-template.yaml"
     fi
 
-    sed "s|{{pod-namespace}}|$POD_NAMESPACE|g; s|{{client-name}}|$client_name|g; s|{{node-name}}|$client_node|g; s|{{server-name}}|$server_name|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" $TEMPLATE_FILE > "pods/pod-$client_name.yaml"
+    sed "s|{{client-name}}|$client_name|g; s|{{node-name}}|$client_node|g; s|{{server-name}}|$server_name|g; s|{{cpu-limit}}|$DEFAULT_CPU_LIMIT|g; s|{{memory-limit}}|$DEFAULT_MEM_LIMIT|g; s|{{cpu-request}}|$DEFAULT_CPU_REQ|g; s|{{memory-request}}|$DEFAULT_MEM_REQ|g; s|{{image}}|$DEFAULT_IMAGE|g" $TEMPLATE_FILE > "pods/pod-$client_name.yaml"
 
     kubectl apply -f "pods/pod-$server_name.yaml"
     kubectl apply -f "pods/pod-$client_name.yaml"
