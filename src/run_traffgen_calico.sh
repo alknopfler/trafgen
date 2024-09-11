@@ -28,22 +28,22 @@ function run_trafgen() {
 }
 
 function get_interface_stats() {
-    ssh capv@"$node_ip" cat /proc/net/dev | grep 'genev_sys'
+    ssh root@"$node_ip" cat /proc/net/dev | grep 'genev_sys'
 }
 
 # this a pod interface server0--63ab25
 function get_interface_stats() {
-    ssh capv@"$node_ip" cat /proc/net/dev | grep $target_pod_name
+    ssh root@"$node_ip" cat /proc/net/dev | grep $target_pod_name
 }
 
 # this a pod interface stats for antrea
 function get_interface_stats() {
-    ssh capv@"$node_ip" cat /proc/net/dev | grep antrea-gw0
+    ssh root@"$node_ip" cat /proc/net/dev | grep antrea-gw0
 }
 
 # this a pod interface stats for uplink
 function get_interface_stats() {
-    ssh capv@"$node_ip" cat /proc/net/dev | grep "$uplink_interface"
+    ssh root@"$node_ip" cat /proc/net/dev | grep "$uplink_interface"
 }
 
 function kill_all_traff_gens() {
@@ -63,7 +63,7 @@ function kill_all_traff_gens() {
 
 get_and_print_interface_stats() {
     local interface_name=$1
-    interface_stats=$(ssh capv@"$node_ip" cat /proc/net/dev | grep "$interface_name")
+    interface_stats=$(ssh root@"$node_ip" cat /proc/net/dev | grep "$interface_name")
     echo "$interface_stats" | while read line; do
         iface=$(echo "$line" | awk -F: '{print $1}')
         rx_pkts=$(echo "$line" | awk '{print $3}')  # RX pkt

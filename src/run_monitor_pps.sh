@@ -38,7 +38,7 @@ OPT_MONITOR=""
 OPT_IS_LOOPBACK=""
 NUM_CORES="1"
 PACKET_SIZE="64"
-DEFAULT_IF_NAME="eth2"
+DEFAULT_IF_NAME="eth0"
 
 output_dir="metrics"
 
